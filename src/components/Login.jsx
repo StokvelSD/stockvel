@@ -5,47 +5,35 @@ import { useAuth } from '../contexts/AuthContext';
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('user');
+  const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    login(email, password, role);
-    if (role === 'admin') navigate('/admin');
-    else if (role === 'treasurer') navigate('/treasurer');
-    else navigate('/dashboard');
+    setError('');
+    try {
+      const role = await login(email, password);
+      if (role === 'admin') navigate('/admin');
+      else if (role === 'treasurer') navigate('/treasurer');
+      else navigate('/dashboard');
+    } catch (err) {
+      setError('Invalid email or password');
+    }
   };
 
   return (
     <div className="auth-form">
       <h2>Login</h2>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div>
           <label>Email:</label>
-          <input 
-            type="email" 
-            value={email} 
-            onChange={(e) => setEmail(e.target.value)} 
-            required 
-          />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div>
           <label>Password:</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-          />
-        </div>
-        <div>
-          <label>Role (for demo):</label>
-          <select value={role} onChange={(e) => setRole(e.target.value)}>
-            <option value="user">General User</option>
-            <option value="treasurer">Treasurer</option>
-            <option value="admin">Admin</option>
-          </select>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         <button type="submit">Login</button>
       </form>
