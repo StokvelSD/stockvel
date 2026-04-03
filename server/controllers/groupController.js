@@ -1,16 +1,29 @@
 const jwt = require('jsonwebtoken');
 const Group = require('../models/Group');
 
-exports.createGroup = async (req, res) => { 
-    try {
-        const { name } = req.body;
-        const token = req.headers.authorization.split(' ')[1];
-        const decoded = jwt.verify(token, 'your_jwt_secret');
-        const userId = decoded.id;  
-        const group = new Group({ name, createdBy: userId });
-        await group.save();
-        res.status(201).json(group);
+const db  = require('../firebase/admin');
+
+
+const createGroup = async (req, res) => { 
+    try{
+        const {groupName, contributionAmount} = req.body;
+        if(!groupName || !contributionAmount) {
+            return res.status(400).json({ error: 'Group name and contribution amount are required' });
+        }
+        await db.collection('groups').add({
+            groupName,
+            contributionAmount,
+            createdBy: req.userId,
+            createdAt: new Date()
+        });
+
+        res.status(201).json({ message: 'Group created successfully' });
     } catch (error) {
-        res.status(400).json({ error: error.message });
+        console.error(error);
+        res.status(500).json({ message: 'Failed to create group' });
     }
 };
+
+module.exports = {
+    createGroup
+}
