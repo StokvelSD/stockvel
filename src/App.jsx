@@ -1,5 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Navbar from './components/Navbar';
+import NavBar from "./components/NavBar";
 import LandingPage from './components/LandingPage';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -20,7 +20,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <Navbar />
+        <NavBar />
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
