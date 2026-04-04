@@ -1,19 +1,18 @@
-const jwt = require('jsonwebtoken');
-const Group = require('../models/Group');
-
 const db  = require('../firebase/admin');
 
 
 const createGroup = async (req, res) => { 
     try{
         const {groupName, contributionAmount} = req.body;
-        if(!groupName || !contributionAmount) {
-            return res.status(400).json({ error: 'Group name and contribution amount are required' });
+        if(!groupName || !groupName.trim() === '') {
+            return res.status(400).json({ error: 'Group name isrequired' });
+        }
+        if(!contributionAmount || contributionAmount <= 0) {
+            return res.status(400).json({ error: 'Contribution amount is required' });
         }
         await db.collection('groups').add({
             groupName,
             contributionAmount,
-            createdBy: req.userId,
             createdAt: new Date()
         });
 
