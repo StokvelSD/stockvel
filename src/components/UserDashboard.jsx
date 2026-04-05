@@ -1,5 +1,3 @@
-import TaskList from '../services/TaskList'; // ← import TaskList at the top
-
 const UserDashboard = () => {
   // Demo data for a logged‑in user
   const paymentHistory = [
@@ -21,25 +19,14 @@ const UserDashboard = () => {
   return (
     <div className="dashboard">
       <h2>My Dashboard</h2>
-      <p style={{ marginBottom: '2rem' }}>
-        Track your stokvel savings and upcoming contributions.
-      </p>
+      <p style={{ marginBottom: '2rem' }}>Track your stokvel savings and upcoming contributions.</p>
 
       {/* Stats cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '2rem',
-        }}
-      >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
         <div className="dashboard-card" style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '2rem' }}>💰</div>
           <h3>Total Paid</h3>
-          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--green)' }}>
-            R{totalPaid}
-          </p>
+          <p style={{ fontSize: '1.8rem', fontWeight: 'bold', color: 'var(--green)' }}>R{totalPaid}</p>
           <small>since joining</small>
         </div>
         <div className="dashboard-card" style={{ textAlign: 'center' }}>
@@ -50,12 +37,6 @@ const UserDashboard = () => {
         </div>
       </div>
 
-      {/* Task List from Firebase */}
-      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
-        <h3>📝 My Tasks</h3>
-        <TaskList /> {/* ← Render TaskList here */}
-      </div>
-
       {/* Upcoming payments */}
       <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
         <h3>📆 Upcoming Payments</h3>
@@ -63,30 +44,23 @@ const UserDashboard = () => {
           <p>No upcoming payments. You're all caught up!</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
-            {upcomingPayments.map((p) => (
-              <li
-                key={p.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  borderBottom: '1px solid var(--border)',
-                  padding: '0.75rem 0',
-                }}
-              >
+            {upcomingPayments.map(p => (
+              <li key={p.id} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid var(--border)',
+                padding: '0.75rem 0'
+              }}>
                 <span>R{p.amount}</span>
                 <span>Due: {new Date(p.dueDate).toLocaleDateString()}</span>
-                <span
-                  style={{
-                    background: 'var(--gold)',
-                    color: 'var(--dark-green)',
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '20px',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  pending
-                </span>
+                <span style={{
+                  background: 'var(--gold)',
+                  color: 'var(--dark-green)',
+                  padding: '0.2rem 0.6rem',
+                  borderRadius: '20px',
+                  fontSize: '0.8rem'
+                }}>pending</span>
               </li>
             ))}
           </ul>
@@ -109,20 +83,18 @@ const UserDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {paymentHistory.map((p) => (
+                {paymentHistory.map(p => (
                   <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
                     <td style={{ padding: '0.5rem' }}>{new Date(p.date).toLocaleDateString()}</td>
                     <td style={{ padding: '0.5rem' }}>R{p.amount}</td>
                     <td style={{ padding: '0.5rem' }}>
-                      <span
-                        style={{
-                          background: 'var(--green)',
-                          color: 'white',
-                          padding: '0.2rem 0.6rem',
-                          borderRadius: '20px',
-                          fontSize: '0.8rem',
-                        }}
-                      >
+                      <span style={{
+                        background: 'var(--green)',
+                        color: 'white',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '20px',
+                        fontSize: '0.8rem'
+                      }}>
                         ✓ {p.status}
                       </span>
                     </td>
