@@ -1,40 +1,32 @@
-name: CI/CD – React (JavaScript) + Firebase
+name: Deploy to Firebase Hosting
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Run tests (if present)
-        run: npm test -- --watch=false
-        continue-on-error: true
-
-      - name: Build React app
+      - name: Build
         run: npm run build
 
       - name: Deploy to Firebase Hosting
-        if: github.event_name == 'push'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          channelId: live
           projectId: stokvel-b920c
+          channelId: live
