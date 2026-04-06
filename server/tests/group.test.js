@@ -1,9 +1,23 @@
 const request = require('supertest');
 const app = require('../index'); 
+const { data } = require('autoprefixer');
 
 jest.mock('../firebase/admin', () => ({
     collection: jest.fn().mockReturnValue({
-        add: jest.fn().mockResolvedValue({ id: 'test-group-id' })
+        add: jest.fn().mockResolvedValue({ id: 'test-group-id' }),
+        get: jest.fn().mockResolvedValue({
+            docs: [
+                {
+                    id: 'test-group-id',
+                    data: () => ({
+                        groupName: 'Test Stokvel',
+                        contributionAmount: 500,
+                        createdAt: {toDate: () => new Date('2026-01-01')}
+                    })
+               }
+            ]
+        })
+    
     })
 }));
 
@@ -35,4 +49,19 @@ describe('Group Creation', () => {
         expect(response.statusCode).toBe(400);
     });
 });
+
+// Given group data exists in the database,
+// When a request is made to fetch groups,
+// Then the server returns a list of groups with their details.
+
+describe('Get Groups', () => {
+    it('should fetch groups successfully', async () => {
+        const response = await request(app)
+            .get('/api/groups');
             
+        expect(response.statusCode).toBe(200);
+        expect(response.body).toBeInstanceOf(Array);
+        expect(response.body[0].groupName).toBe('Test Stokvel');
+
+    });
+});
