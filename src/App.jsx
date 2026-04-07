@@ -58,9 +58,10 @@ function App() {
           <Route
             path="/treasurer"
             element={
-              <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
-                <TreasurerDashboard />
-              </ProtectedRoute>
+              <TreasurerDashboard />
+              //  <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
+              //    <TreasurerDashboard />
+              //  </ProtectedRoute>
             }
           />
 
