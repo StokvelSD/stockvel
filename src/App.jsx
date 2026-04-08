@@ -8,6 +8,9 @@ import TreasurerDashboard from './components/TreasurerDashboard.jsx';
 import UserDashboard from './components/UserDashboard';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useRef } from 'react';
+import { db, auth } from './Firebase-Config';
+import { collection, addDoc } from 'firebase/firestore';
 
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, role } = useAuth();
@@ -31,6 +34,7 @@ function App() {
               <AdminDashboard />
             </ProtectedRoute>
           } />
+          
           <Route path="/treasurer" element={
             <ProtectedRoute allowedRoles={['treasurer', 'admin']}>
               <TreasurerDashboard />
@@ -42,21 +46,16 @@ function App() {
             </ProtectedRoute>
           } />
 
+          <Route path="/add-contribution" element={
+            <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+              <AddContribution />
+            </ProtectedRoute>
+          } />
+
           <Route path="/unauthorized" element={<h2>Access Denied</h2>} />
         </Routes>
       </AuthProvider>
     </Router>
-  );
-
-  return (
-    <div className="App">
-      Contributions
-      <input type="text" ref={contributionRef} placeholder="Enter contribution amount" />
-      <input type="date" ref={dateRef} />
-      
-      <select name="date" id=""></select>
-      <button onClick={handleAddContribution}>Add Contribution</button>
-    </div>
   );
 }
 

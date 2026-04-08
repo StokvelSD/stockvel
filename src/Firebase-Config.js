@@ -5,6 +5,8 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import "firebase/storage";
 
+import { getApps, getApp } from "firebase/app";
+
 const firebaseConfig = {
   apiKey: "AIzaSyAHOrb5-hERdCpecMhvvHyqcNp_pJ69Txo",
   authDomain: "stokvel-b920c.firebaseapp.com",
@@ -16,7 +18,10 @@ const firebaseConfig = {
   measurementId: "G-Y49WEE4GYQ"
 };
 
-const app = initializeApp(firebaseConfig);
+
+const app = getApps().length === 0
+  ? initializeApp(firebaseConfig)
+  : getApp();
 export const auth = getAuth(app);
 
 
