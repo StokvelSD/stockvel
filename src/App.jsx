@@ -1,3 +1,18 @@
+
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Navbar from './components/NavBar';
+import LandingPage from './components/LandingPage';
+import Login from './components/Login';
+import Register from './components/Register';
+import AdminDashboard from './components/AdminDashboard';
+import TreasurerDashboard from './components/TreasurerDashboard.jsx';
+import UserDashboard from './components/UserDashboard';
+import './App.css';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useRef } from 'react';
+import { db, auth } from './Firebase-Config';
+import { collection, addDoc } from 'firebase/firestore';
+import AddContribution from './pages/AddContribution';
 import {
   BrowserRouter as Router,
   Routes,
@@ -45,6 +60,16 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
+
+          <Route path="/admin" element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          
+          <Route path="/treasurer" element={
+            <ProtectedRoute allowedRoles={['treasurer', 'admin']}>
+
           {/* Their dashboards */}
           <Route
             path="/admin-dashboard"
@@ -57,13 +82,20 @@ function App() {
 
           <Route
             path="/treasurer"
-            element={
+            el
               <TreasurerDashboard />
-              //  <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
-              //    <TreasurerDashboard />
-              //  </ProtectedRoute>
+              <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
+               <TreasurerDashboard />
+               </ProtectedRoute>
             }
           />
+
+
+          <Route path="/add-contribution" element={
+            <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+              <AddContribution />
+            </ProtectedRoute>
+          } />
 
           <Route
             path="/dashboard"
@@ -87,16 +119,6 @@ function App() {
         </Routes>
       </Router>
     </AuthProvider>
-  );
-
-  return (
-    <div className="App">
-      Contributions
-      <input type="text" ref={contributionRef} placeholder="Enter contribution amount" />
-      <input type="date" ref={dateRef} />
-      <select name="date" id=""></select>
-      <button onClick={handleAddContribution}>Add Contribution</button>
-    </div>
   );
 }
 
