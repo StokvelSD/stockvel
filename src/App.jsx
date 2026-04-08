@@ -1,15 +1,5 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import Navbar from './components/Navbar.jsx';
-import LandingPage from './components/LandingPage';
-import Login from './components/Login';
-import Register from './components/Register';
-import AdminDashboard from './components/AdminDashboard';
-import TreasurerDashboard from './components/TreasurerDashboard.jsx';
-import UserDashboard from './components/UserDashboard';
-import './App.css';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-
 import NavBar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
