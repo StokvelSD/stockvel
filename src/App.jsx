@@ -1,15 +1,13 @@
-
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import NavBar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
 import Register from "./components/Register";
-
 import AdminDashboard from "./components/AdminDashboard";
 import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
 import UserDashboard from "./components/UserDashboard";
+import AddContribution from "./components/AddContribution";
 
-import AdminPage from "./pages/AdminPage";
 import CreateGroupPage from "./pages/CreateGroupPage";
 import BrowseGroupsPage from "./pages/BrowseGroupsPage";
 
@@ -19,7 +17,6 @@ import "./CreateGroup.css";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
-// Protected Route
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, role } = useAuth();
 
@@ -36,66 +33,50 @@ function App() {
         <NavBar />
 
         <Routes>
-          {/* Public */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
           <Route
             path="/admin"
-            element={(
+            element={
               <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDashboard />
               </ProtectedRoute>
-            )}
+            }
           />
 
           <Route
             path="/treasurer"
-            element={(
+            element={
               <ProtectedRoute allowedRoles={['treasurer', 'admin']}>
                 <TreasurerDashboard />
               </ProtectedRoute>
-            )}
-          />
-
-          <Route
-            path="/dashboard"
-            element={(
-              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
-                <UserDashboard />
-              </ProtectedRoute>
-            )}
-          />
-
-          <Route
-            path="/add-contribution"
-            element={(
-              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
-                <AddContribution />
-              </ProtectedRoute>
-            )}
+            }
           />
 
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["user", "treasurer", "admin"]}>
+              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
                 <UserDashboard />
               </ProtectedRoute>
             }
           />
 
-          {/*  YOUR PAGES (integrated properly) */}
-          <Route path="/" element={<Navigate to="/admin" />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route
+            path="/add-contribution"
+            element={
+              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+                <AddContribution />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
 
-          {/* Unauthorized */}
           <Route path="/unauthorized" element={<h2>Access Denied</h2>} />
-
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
