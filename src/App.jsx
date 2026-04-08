@@ -10,24 +10,6 @@ import UserDashboard from './components/UserDashboard';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-import NavBar from "./components/Navbar";
-import LandingPage from "./components/LandingPage";
-import Login from "./components/Login";
-import Register from "./components/Register";
-
-import AdminDashboard from "./components/AdminDashboard";
-import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
-import UserDashboard from "./components/UserDashboard";
-
-import AdminPage from "./pages/AdminPage";
-import CreateGroupPage from "./pages/CreateGroupPage";
-
-import "./App.css";
-import "./AdminMain.css";
-import "./CreateGroup.css";
-
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-
 // Protected Route
 const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, role } = useAuth();
@@ -42,7 +24,7 @@ function App() {
   return (
     <AuthProvider>
       <Router>
-        <NavBar />
+        <Navbar />
 
         <Routes>
           {/* Public */}
@@ -76,30 +58,6 @@ function App() {
               </ProtectedRoute>
             )}
           />
-
-          <Route
-            path="/add-contribution"
-            element={(
-              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
-                <AddContribution />
-              </ProtectedRoute>
-            )}
-          />
-
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["user", "treasurer", "admin"]}>
-                <UserDashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* 🔥 YOUR PAGES (integrated properly) */}
-          <Route path="/" element={<Navigate to="/admin" />} />
-          <Route path="/admin" element={<AdminPage />} />
-          <Route path="/create-group" element={<CreateGroupPage />} />
-
           {/* Unauthorized */}
           <Route path="/unauthorized" element={<h2>Access Denied</h2>} />
 
