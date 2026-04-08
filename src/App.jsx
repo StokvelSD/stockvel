@@ -1,11 +1,16 @@
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
 
-import NavBar from "./components/NavBar";
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Navbar from './components/Navbar.jsx';
+import LandingPage from './components/LandingPage';
+import Login from './components/Login';
+import Register from './components/Register';
+import AdminDashboard from './components/AdminDashboard';
+import TreasurerDashboard from './components/TreasurerDashboard.jsx';
+import UserDashboard from './components/UserDashboard';
+import './App.css';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+import NavBar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
 import Register from "./components/Register";
@@ -46,23 +51,40 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          {/* Their dashboards */}
           <Route
-            path="/admin-dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+            path="/admin"
+            element={(
+              <ProtectedRoute allowedRoles={['admin']}>
                 <AdminDashboard />
               </ProtectedRoute>
-            }
+            )}
           />
 
           <Route
             path="/treasurer"
-            element={
-              <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
+            element={(
+              <ProtectedRoute allowedRoles={['treasurer', 'admin']}>
                 <TreasurerDashboard />
               </ProtectedRoute>
-            }
+            )}
+          />
+
+          <Route
+            path="/dashboard"
+            element={(
+              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+                <UserDashboard />
+              </ProtectedRoute>
+            )}
+          />
+
+          <Route
+            path="/add-contribution"
+            element={(
+              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+                <AddContribution />
+              </ProtectedRoute>
+            )}
           />
 
           <Route

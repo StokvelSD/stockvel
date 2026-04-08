@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-//import "../.css";
 
 function CreateGroupForm() {
-  const navigate = useNavigate(); // back bar button
+  const navigate = useNavigate();
 
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
@@ -13,32 +12,61 @@ function CreateGroupForm() {
   const [duration, setDuration] = useState("");
   const [payoutOrder, setPayoutOrder] = useState("");
 
-  const handleSubmit = (e) => {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = {
-      groupName,
-      description,
-      maxMembers,
-      contribution,
-      frequency,
-      duration,
-      payoutOrder,
-    };
-    console.log("Form Submitted:", formData);
-    alert("Stokvel group created!"); /// i will need to replace with the API submission
+    console.log("SUBMIT CLICKED 🔥");
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("http://localhost:5000/api/groups", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          groupName,
+          description,
+          maxMembers,
+          contributionAmount: contribution,
+          meetingFrequency: frequency,
+          duration,
+          payoutOrder,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Redirect with success message
+        navigate("/admin", {
+          state: { message: "Stokvel group created successfully!" },
+        });
+      } else {
+        setError(data.message || "Failed to create group");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Could not connect to server");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <main>
-      {" "}
       <section>
         <button className="back-btn" onClick={() => navigate("/")}>
           ←
         </button>
-        <br />
       </section>
+
       <h2 className="topic">Create stokvel group</h2>
-      <br></br>
+
       <section className="container">
         <form className="stokvel-form" onSubmit={handleSubmit}>
           <section className="form-section">
@@ -104,6 +132,7 @@ function CreateGroupForm() {
               required
             />
 
+            {/*  FIXED DROPDOWN */}
             <label htmlFor="payout-order">Payout Order</label>
             <select
               id="payout-order"
@@ -111,12 +140,19 @@ function CreateGroupForm() {
               onChange={(e) => setPayoutOrder(e.target.value)}
               required
             >
-              <option value="">Admin-defined (manual order)</option>
+              <option value="">Select payout order</option>
+              <option value="manual">Admin-defined (manual order)</option>
+              <option value="random">Random</option>
+              <option value="first">First joined</option>
             </select>
+
+            {/* Error display */}
+            {error && <p className="error">{error}</p>}
           </section>
 
-          <button type="submit" className="submit-btn">
-            Create Group
+          {/* Loading state */}
+          <button type="submit" className="submit-btn" disabled={loading}>
+            {loading ? "Creating..." : "Create Group"}
           </button>
         </form>
       </section>

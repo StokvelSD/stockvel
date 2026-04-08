@@ -3,7 +3,15 @@ const db  = require('../firebase/admin');
 
 const createGroup = async (req, res) => { 
     try{
-        const {groupName, contributionAmount} = req.body;
+        const {
+            groupName, 
+            contributionAmount,
+            description,
+            maxMembers,
+            meetingFrequency,
+            duration,
+            payoutOrder
+        } = req.body;
         if(!groupName || !groupName.trim() === '') {
             return res.status(400).json({ error: 'Group name is required' });
         }
@@ -13,6 +21,11 @@ const createGroup = async (req, res) => {
         await db.collection('groups').add({
             groupName,
             contributionAmount,
+            description,
+            maxMembers,
+            meetingFrequency,
+            duration,
+            payoutOrder,
             createdAt: new Date()
         });
 
