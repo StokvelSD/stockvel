@@ -1,4 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import NavBar from "./components/NavBar.jsx";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
@@ -7,12 +12,15 @@ import AdminDashboard from "./components/AdminDashboard";
 import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
 import UserDashboard from "./components/UserDashboard";
 
+import AdminPage from "./pages/AdminPage";
+
 import CreateGroupPage from "./pages/CreateGroupPage";
 import BrowseGroupsPage from "./pages/BrowseGroupsPage";
-
+import ConfigureGroupPage from "./pages/ConfigureGroupPage";
 import "./App.css";
 import "./AdminMain.css";
 import "./CreateGroup.css";
+import "./Configure.css";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
@@ -36,19 +44,12 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/admin" element={<AdminPage />} />
 
           <Route
             path="/treasurer"
             element={
-              <ProtectedRoute allowedRoles={['treasurer', 'admin']}>
+              <ProtectedRoute allowedRoles={["treasurer", "admin"]}>
                 <TreasurerDashboard />
               </ProtectedRoute>
             }
@@ -57,12 +58,12 @@ function App() {
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute allowedRoles={['user', 'treasurer', 'admin']}>
+              <ProtectedRoute allowedRoles={["user", "treasurer", "admin"]}>
                 <UserDashboard />
               </ProtectedRoute>
             }
           />
-
+          <Route path="/configure-group" element={<ConfigureGroupPage />} />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
 
