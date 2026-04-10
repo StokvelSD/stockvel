@@ -1,12 +1,14 @@
-import { useNavigate } from "react-router-dom"; // makes my actioncard clickable
+// ─── src/components/ActionCard.jsx ──────────────────────────
+import { useNavigate } from 'react-router-dom';
+import '../index.css';
 
-function ActionCard({ icon, label, route }) {
+function ActionCard({ icon, label, route, colorClass = 'blue' }) {
   const navigate = useNavigate();
   return (
-    <article className="action" onClick={() => navigate(route)}>
-      <span className="icon">{icon}</span>
+    <div className="action-card" onClick={() => route && navigate(route)}>
+      <div className={`action-icon ${colorClass}`}>{icon}</div>
       <p>{label}</p>
-    </article>
+    </div>
   );
 }
 
