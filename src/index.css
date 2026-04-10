@@ -305,10 +305,17 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius-lg); padding: 1.5rem; box-shadow: var(--shadow-sm);
 }
 
+
+
 /* ===== AUTH FORMS ===== */
+
 .auth-page {
-  min-height: calc(100vh - 62px); display: flex; align-items: center;
-  justify-content: center; padding: 2rem; background: var(--bg);
+  min-height: calc(100vh - 62px);
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
 }
 .auth-form {
   background: var(--surface); border: 1px solid var(--border);

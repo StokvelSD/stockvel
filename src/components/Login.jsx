@@ -29,56 +29,39 @@ const Login = () => {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-card-header">
-          <div className="auth-logo">
-            <svg width="28" height="28" viewBox="0 0 26 26" fill="none">
-              <rect width="26" height="26" rx="6" fill="#1e3a8a"/>
-              <path d="M13 6v14M9 10h5.5a2.5 2.5 0 0 1 0 5H9m0-5v5"
-                stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="auth-logo-text">StokvelHub</span>
-          </div>
-          <h2>Welcome back</h2>
-          <p>Sign in to your account</p>
+      <div className="auth-form">
+        <div className="auth-form-logo">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+            <rect width="36" height="36" rx="8" fill="#1d4ed8"/>
+            <path d="M18 7v22M13 13h7a4 4 0 0 1 0 8h-7M13 13v8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
+        <h2>Welcome back</h2>
+        <p className="auth-subtitle">Sign in to your account</p>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="auth-error">{error}</div>}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Email address</label>
-            <input
-              className="form-control"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
           </div>
           <div className="form-group">
             <label>Password</label>
-            <input
-              className="form-control"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
+            <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '0.7rem', marginTop: '0.5rem' }} disabled={loading}>
+          <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }} disabled={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <div className="auth-footer">
-          Don&apos;t have an account? <Link to="/register">Create one</Link>
-        </div>
+        <p className="auth-footer">
+          Don't have an account? <Link to="/register">Create one</Link>
+        </p>
       </div>
     </div>
   );
+ 
 };
 
 export default Login;
