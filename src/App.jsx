@@ -21,6 +21,7 @@ import "./App.css";
 import "./AdminMain.css";
 import "./CreateGroup.css";
 import "./Configure.css";
+import "./ShowActiveGroup.css";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
