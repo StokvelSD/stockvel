@@ -1,11 +1,13 @@
+import '../index.css';
+
 function Wallet() {
   return (
-    <section className="wallet">
-      <p className="title">ADMIN WALLET</p>
-      <h1>R Balance.00</h1>
-      <p>Admin Nkosi</p>
-      <small>Group Administrator</small>
-    </section>
+    <div className="admin-wallet">
+      <div className="wallet-label">Admin Wallet</div>
+      <div className="wallet-balance">R 0.00</div>
+      <div className="wallet-name">Admin Nkosi</div>
+      <div className="wallet-role">Group Administrator</div>
+    </div>
   );
 }
 
