@@ -97,35 +97,57 @@ const joinGroup = async (req, res) => {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // We check if group exists
+    // Validate user exists in the system
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     const groupRef = db.collection("groups").doc(groupId);
-    const groupDoc = await groupRef.get();
-    if (!groupDoc.exists) {
-      return res.status(404).json({ error: "Group not found" });
-    }
 
-    const groupData = groupDoc.data();
+    // Use transaction to prevent race conditions and ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      const groupDoc = await transaction.get(groupRef);
 
-    // We check if user is already a member
-    if (groupData.members && groupData.members.includes(userId)) {
-      return res.status(400).json({ error: "You are already a member of this group" });
-    }
+      if (!groupDoc.exists) {
+        throw new Error("Group not found");
+      }
 
-    // We check if group is full
-    const currentMembers = groupData.members ? groupData.members.length : 0;
-    if (currentMembers >= groupData.maxMembers) {
-      return res.status(400).json({ error: "Group is full" });
-    }
+      const groupData = groupDoc.data();
 
-    // Add user directly to group members (no approval needed/we will decide this with group members later)
-    await groupRef.update({
-      members: [...(groupData.members || []), userId]
+      // Check if user is already a member
+      if (groupData.members && groupData.members.includes(userId)) {
+        throw new Error("You are already a member of this group");
+      }
+
+      // Check if group is full
+      const currentMembers = groupData.members ? groupData.members.length : 0;
+      if (currentMembers >= groupData.maxMembers) {
+        throw new Error("Group is full");
+      }
+
+      // Add user directly to group members using arrayUnion (atomic, prevents duplicates)
+      transaction.update(groupRef, {
+        members: require("firebase-admin").firestore.FieldValue.arrayUnion(userId)
+      });
     });
 
     res.status(201).json({ message: "Successfully joined the group!" });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to join group" });
+    console.error("joinGroup error:", error.message);
+
+    // Handle specific errors
+    if (error.message.includes("already a member")) {
+      return res.status(400).json({ error: "You are already a member of this group" });
+    }
+    if (error.message.includes("Group is full")) {
+      return res.status(400).json({ error: "Group is full" });
+    }
+    if (error.message.includes("Group not found")) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    res.status(500).json({ error: "Failed to join group" });
   }
 };
 

@@ -52,7 +52,7 @@ function GroupList() {
 
   const handleJoinGroup = async (groupId) => {
     if (!user) {
-      setMessage(groupId, 'error', 'Please log in to send join requests');
+      setMessage(groupId, 'error', 'Please log in to join');
       return;
     }
 
@@ -79,6 +79,11 @@ function GroupList() {
       }
 
       setMessage(groupId, 'success', data.message);
+      
+      // Refetch groups to update member count and button state
+      setTimeout(() => {
+        fetchGroups();
+      }, 500);
     } catch (err) {
       setMessage(groupId, 'error', err.message);
     } finally {
