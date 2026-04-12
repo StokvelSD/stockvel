@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { db } from "../firebase/firebase";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
 
 function CreateGroupForm() {
   const navigate = useNavigate();
@@ -17,41 +19,38 @@ function CreateGroupForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("SUBMIT CLICKED 🔥");
+
+    if (!groupName.trim()) {
+      setError("Group name is required");
+      return;
+    }
+    if (!contribution || Number(contribution) <= 0) {
+      setError("Contribution amount must be greater than 0");
+      return;
+    }
 
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/groups", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          groupName,
-          description,
-          maxMembers,
-          contributionAmount: contribution,
-          meetingFrequency: frequency,
-          duration,
-          payoutOrder,
-        }),
+      await addDoc(collection(db, "groups"), {
+        groupName: groupName.trim(),
+        description,
+        maxMembers: Number(maxMembers),
+        contributionAmount: Number(contribution),
+        meetingFrequency: frequency,
+        duration: Number(duration),
+        payoutOrder,
+        members: [],
+        createdAt: Timestamp.now(),
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        // Redirect with success message
-        navigate("/admin", {
-          state: { message: "Stokvel group created successfully!" },
-        });
-      } else {
-        setError(data.message || "Failed to create group");
-      }
+      navigate("/admin", {
+        state: { message: "Stokvel group created successfully!" },
+      });
     } catch (err) {
       console.error(err);
-      setError("Could not connect to server");
+      setError("Failed to create group. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -132,7 +131,6 @@ function CreateGroupForm() {
               required
             />
 
-            {/*  FIXED DROPDOWN */}
             <label htmlFor="payout-order">Payout Order</label>
             <select
               id="payout-order"
@@ -146,11 +144,9 @@ function CreateGroupForm() {
               <option value="first">First joined</option>
             </select>
 
-            {/* Error display */}
             {error && <p className="error">{error}</p>}
           </section>
 
-          {/* Loading state */}
           <button type="submit" className="submit-btn" disabled={loading}>
             {loading ? "Creating..." : "Create Group"}
           </button>
