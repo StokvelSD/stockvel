@@ -27,7 +27,14 @@ export default function TreasurerDashboard() {
     })();
   }, []);
 
-  const totalCollected = contributions.filter(c => isPaidOrCompleted(c.status)).reduce((s, c) => s + Number(c.amount || 0), 0);
+  // FIX: Safely strip out "R" or letters before doing the math so you don't get "NaN"
+  const totalCollected = contributions
+    .filter(c => isPaidOrCompleted(c.status))
+    .reduce((s, c) => {
+      const cleanAmount = String(c.amount || '0').replace(/[^0-9.]/g, '');
+      return s + Number(cleanAmount);
+    }, 0);
+
   const pendingCount   = contributions.filter(c => !isPaidOrCompleted(c.status)).length;
   const nextRotation   = 'May 2025';
 
@@ -132,11 +139,16 @@ export default function TreasurerDashboard() {
               {contributions.map(c => {
                 const paid = isPaidOrCompleted(c.status);
                 const confTime = formatTimestamp(c.confirmedAt);
+                
+                const safeDate = formatTimestamp(c.date) || c.date; 
+                
+                const displayAmount = String(c.amount || '0').replace(/[^0-9.]/g, ''); 
+
                 return (
                   <tr key={c.id}>
                     <td><strong>{c.member || c.userId || 'Unknown'}</strong></td>
-                    <td>R {c.amount}</td>
-                    <td style={{ color: '#64748b' }}>{c.date || '—'}</td>
+                    <td>R {displayAmount}</td>
+                    <td style={{ color: '#64748b' }}>{typeof safeDate === 'string' ? safeDate : '—'}</td>
                     <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{confTime || '—'}</td>
                     <td style={{ color: '#64748b' }}>{c.paymentMethod || '—'}</td>
                     <td>
