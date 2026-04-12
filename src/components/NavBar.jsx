@@ -34,6 +34,7 @@ const Navbar = () => {
         <Link to="/" onClick={() => setIsOpen(false)}>Home</Link>
         {user ? (
           <>
+           <Link to="/dashboard">Dashboard</Link>
             <Link to="/add-contribution">Add Contribution</Link>
             <span className="user-welcome">Welcome, {user.email} ({user.role})</span>
             {user.role === 'admin' && <Link to="/admin" onClick={() => setIsOpen(false)}>Admin Panel</Link>}

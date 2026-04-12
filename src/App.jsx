@@ -9,6 +9,7 @@ import TreasurerDashboard from './components/TreasurerDashboard.jsx';
 import UserDashboard from './components/UserDashboard';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Dashboard from './pages/Dashboard.jsx';
 
 // Protected Route
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -40,7 +41,7 @@ function App() {
               </ProtectedRoute>
             )}
           />
-
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route
             path="/treasurer"
             element={(
