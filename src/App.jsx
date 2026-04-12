@@ -17,6 +17,7 @@ import AdminPage from "./pages/AdminPage";
 import CreateGroupPage from "./pages/CreateGroupPage";
 import BrowseGroupsPage from "./pages/BrowseGroupsPage";
 import ConfigureGroupPage from "./pages/ConfigureGroupPage";
+import GroupDetailsPage from "./pages/GroupDetailsPage";
 import "./App.css";
 import "./AdminMain.css";
 import "./CreateGroup.css";
@@ -67,6 +68,7 @@ function App() {
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
+          <Route path="/group/:groupId" element={<GroupDetailsPage />} />
 
           <Route path="/unauthorized" element={<h2>Access Denied</h2>} />
           <Route path="*" element={<Navigate to="/" />} />
