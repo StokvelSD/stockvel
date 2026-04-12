@@ -1,28 +1,19 @@
 const request = require('supertest');
 const app = require('../index');
 
-// Mock for a group doc that exists
-const mockGroupDoc = {
-  exists: true,
-  data: () => ({
-    groupName: 'Test Stokvel',
-    contributionAmount: 500,
-    createdAt: { toDate: () => new Date('2026-01-01') }
-  })
-};
-
-// Reusable chainable where mock (supports .where().where().get())
-const makeWhereMock = (empty = true) => {
-  const whereMock = {
-    where: jest.fn(),
-    get: jest.fn().mockResolvedValue({ empty })
-  };
-  whereMock.where.mockReturnValue(whereMock); // chaining .where().where()
-  return whereMock;
-};
-
 jest.mock('../firebase/admin', () => {
-  const whereMock = makeWhereMock(true); // no existing join request by default
+  const mockTransaction = {
+    get: jest.fn().mockResolvedValue({
+      exists: true,
+      data: () => ({
+        members: [],
+        maxMembers: 10,
+      }),
+    }),
+    update: jest.fn(),
+  };
+
+  const mockGroupRef = {}; // just a ref object, passed into transaction
 
   return {
     collection: jest.fn().mockImplementation((collectionName) => {
@@ -36,30 +27,32 @@ jest.mock('../firebase/admin', () => {
                 data: () => ({
                   groupName: 'Test Stokvel',
                   contributionAmount: 500,
-                  createdAt: { toDate: () => new Date('2026-01-01') }
-                })
-              }
-            ]
+                  createdAt: { toDate: () => new Date('2026-01-01') },
+                }),
+              },
+            ],
           }),
-          doc: jest.fn().mockReturnValue({
-            get: jest.fn().mockResolvedValue(mockGroupDoc)
-          })
+          doc: jest.fn().mockReturnValue(mockGroupRef),
         };
       }
 
-      if (collectionName === 'joinRequests') {
+      if (collectionName === 'users') {
         return {
-          add: jest.fn().mockResolvedValue({ id: 'test-join-id' }),
-          where: jest.fn().mockReturnValue(whereMock)
+          doc: jest.fn().mockReturnValue({
+            get: jest.fn().mockResolvedValue({ exists: true }),
+          }),
         };
       }
 
       return {};
-    })
+    }),
+
+    runTransaction: jest.fn().mockImplementation(async (callback) => {
+      await callback(mockTransaction);
+    }),
   };
 });
 
-// --- Group Creation ---
 describe('Group Creation', () => {
   it('should create a group successfully', async () => {
     const response = await request(app)
@@ -79,7 +72,6 @@ describe('Group Creation', () => {
   });
 });
 
-// --- Get Groups ---
 describe('Get Groups', () => {
   it('should fetch groups successfully', async () => {
     const response = await request(app).get('/api/groups');
@@ -90,15 +82,14 @@ describe('Get Groups', () => {
   });
 });
 
-// --- Join Requests ---
-describe('Join Requests', () => {
-  it('should send a join request successfully', async () => {
+describe('Join Group', () => {
+  it('should join a group successfully', async () => {
     const response = await request(app)
       .post('/api/groups/test-group-id/join')
       .send({ userId: 'user-123' });
 
     expect(response.statusCode).toBe(201);
-    expect(response.body.message).toBe('Join request sent successfully');
+    expect(response.body.message).toBe('Successfully joined the group!');
   });
 
   it('should return 400 if userId is missing', async () => {
@@ -107,5 +98,24 @@ describe('Join Requests', () => {
       .send({});
 
     expect(response.statusCode).toBe(400);
+  });
+
+  it('should return 404 if user does not exist', async () => {
+    const { collection } = require('../firebase/admin');
+    collection.mockImplementationOnce((name) => {
+      if (name === 'users') {
+        return {
+          doc: jest.fn().mockReturnValue({
+            get: jest.fn().mockResolvedValue({ exists: false }),
+          }),
+        };
+      }
+    });
+
+    const response = await request(app)
+      .post('/api/groups/test-group-id/join')
+      .send({ userId: 'ghost-user' });
+
+    expect(response.statusCode).toBe(404);
   });
 });
