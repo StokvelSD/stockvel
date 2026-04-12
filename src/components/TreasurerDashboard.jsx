@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase/firebase';
+import { db, auth } from '../firebase/firebase'; 
 import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth'; 
 import '../index.css';
 
 const isPaidOrCompleted = (status) => ['paid', 'completed', 'confirmed'].includes((status || '').toLowerCase());
@@ -18,16 +19,24 @@ export default function TreasurerDashboard() {
   const currentGroupId = 'group_001';
 
   useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(collection(db, 'contributions'));
-        setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const snap = await getDocs(collection(db, 'contributions'));
+          setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (e) { 
+          console.error(e); 
+        } finally { 
+          setLoading(false); 
+        }
+      } else {
+        setLoading(false); 
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // FIX: Safely strip out "R" or letters before doing the math so you don't get "NaN"
   const totalCollected = contributions
     .filter(c => isPaidOrCompleted(c.status))
     .reduce((s, c) => {
