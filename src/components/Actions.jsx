@@ -4,7 +4,7 @@ function Actions() {
   return (
     <section className="actions">
       <ActionCard icon="+" label="Create groups" route="/create-group" />
-      <ActionCard icon="⚙️" label="Configure" />
+      <ActionCard icon="⚙️" label="Configure" route="/configure-group" />
       <ActionCard icon="👥" label="Members" />
       <ActionCard icon="💲" label="Payouts" />
     </section>

@@ -158,3 +158,6 @@ dist-ssr
 *.sln
 *.sw?
 >>>>>>> 1d55d02 (project first commit)
+serviceAccountKey.json
+*.json
+serviceAccountKey.json

@@ -17,3 +17,31 @@ Stores registered user profiles.
   "email": "john@example.com",
   "createdAt": "timestamp"
 }
+```
+
+### groups (collection)
+Stores stokvel groups.
+
+**Document ID:** auto-generated
+
+```json
+{
+  "groupName": "Monthly Savers",
+  "contributionAmount": 500,
+  "createdAt": "timestamp"
+}
+```
+
+### joinRequests (collection)
+Stores join requests from users to groups.
+
+**Document ID:** auto-generated
+
+```json
+{
+  "groupId": "groupDocId",
+  "userId": "userDocId",
+  "status": "pending|approved|rejected",
+  "createdAt": "timestamp"
+}
+```
