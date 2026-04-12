@@ -71,6 +71,9 @@ web_modules/
 .env.*
 !.env.example
 
+# Service account keys and local secret files
+server/firebase/serviceAccountKey.json
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
@@ -161,3 +164,5 @@ dist-ssr
 serviceAccountKey.json
 *.json
 serviceAccountKey.json
+.vercel
+.env*.local
