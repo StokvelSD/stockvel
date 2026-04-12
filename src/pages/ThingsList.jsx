@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchPaidContributions } from "./thingsData";
+import { fetchPaidContributions } from "./Thingsdata";
 import ThingCard from "./ThingCard";
 
 const ThingsList = () => {

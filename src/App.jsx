@@ -11,7 +11,7 @@ import Register from "./components/Register";
 import AdminDashboard from "./components/AdminDashboard";
 import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
 import UserDashboard from "./components/UserDashboard";
-
+import Dashboard from "./pages/Dashboard.jsx";
 import AdminPage from "./pages/AdminPage";
 
 import CreateGroupPage from "./pages/CreateGroupPage";
@@ -64,6 +64,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/contributions" element={<Dashboard />} />
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />

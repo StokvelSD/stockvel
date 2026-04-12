@@ -17,7 +17,7 @@ export const fetchPaidContributions = async () => {
   const q = query(
     contributionsRef,
     where("member", "==", member), // hardcoded for testing, replace with dynamic member variable
-    where("status", "==", "paid")
+    where("status", "==", "paid") 
   );
 
   const querySnapshot = await getDocs(q);
