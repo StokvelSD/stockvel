@@ -30,6 +30,7 @@ const createGroup = async (req, res) => {
       meetingFrequency,
       duration: Number(duration),
       payoutOrder,
+      members: [],
       createdAt: new Date(),
     });
 
@@ -59,47 +60,78 @@ const getGroups = async (req, res) => {
   }
 };
 
-const createJoinRequest = async (req, res) => {
+const getGroupById = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { userId } = req.body; // Assuming userId is sent in body, later from auth
+    
+    if (!groupId) {
+      return res.status(400).json({ error: "Group ID is required" });
+    }
+    
+    const groupDoc = await db.collection("groups").doc(groupId).get();
+
+    if (!groupDoc.exists) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const data = groupDoc.data();
+    const group = {
+      id: groupDoc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    };
+
+    res.status(200).json(group);
+  } catch (error) {
+    console.error("getGroupById error:", error.message);
+    res.status(500).json({ error: "Failed to fetch group" });
+  }
+};
+
+const joinGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Check if group exists
-    const groupDoc = await db.collection("groups").doc(groupId).get();
+    // We check if group exists
+    const groupRef = db.collection("groups").doc(groupId);
+    const groupDoc = await groupRef.get();
     if (!groupDoc.exists) {
       return res.status(404).json({ error: "Group not found" });
     }
 
-    // Check if join request already exists
-    const existingRequest = await db
-      .collection("joinRequests")
-      .where("groupId", "==", groupId)
-      .where("userId", "==", userId)
-      .get();
-    if (!existingRequest.empty) {
-      return res.status(400).json({ error: "Join request already sent" });
+    const groupData = groupDoc.data();
+
+    // We check if user is already a member
+    if (groupData.members && groupData.members.includes(userId)) {
+      return res.status(400).json({ error: "You are already a member of this group" });
     }
 
-    await db.collection("joinRequests").add({
-      groupId,
-      userId,
-      status: "pending",
-      createdAt: new Date(),
+    // We check if group is full
+    const currentMembers = groupData.members ? groupData.members.length : 0;
+    if (currentMembers >= groupData.maxMembers) {
+      return res.status(400).json({ error: "Group is full" });
+    }
+
+    // Add user directly to group members (no approval needed/we will decide this with group members later)
+    await groupRef.update({
+      members: [...(groupData.members || []), userId]
     });
 
-    res.status(201).json({ message: "Join request sent successfully" });
+    res.status(201).json({ message: "Successfully joined the group!" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Failed to send join request" });
+    res.status(500).json({ message: "Failed to join group" });
   }
 };
 
 module.exports = {
   createGroup,
   getGroups,
-  createJoinRequest,
+  getGroupById,
+  joinGroup,
 };
