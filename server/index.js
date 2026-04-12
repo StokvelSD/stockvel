@@ -8,7 +8,7 @@ const groupRoutes = require("./routes/groups");
 const app = express();
 app.use(
   cors({
-    origin: /^http:\/\/localhost:\d+$/,
+    origin: [/^http:\/\/localhost:\d+$/, "https://stokvel-b920c.web.app"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
