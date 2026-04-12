@@ -28,20 +28,14 @@ Stores stokvel groups.
 {
   "groupName": "Monthly Savers",
   "contributionAmount": 500,
+  "description": "Group description",
+  "maxMembers": 10,
+  "meetingFrequency": "monthly",
+  "duration": 12,
+  "payoutOrder": "random",
+  "members": ["userId1", "userId2"],
   "createdAt": "timestamp"
 }
 ```
 
-### joinRequests (collection)
-Stores join requests from users to groups.
-
-**Document ID:** auto-generated
-
-```json
-{
-  "groupId": "groupDocId",
-  "userId": "userDocId",
-  "status": "pending|approved|rejected",
-  "createdAt": "timestamp"
-}
-```
+**Note:** Users join groups directly without needing admin approval. The `members` array stores the Firebase Auth UIDs of all group members.

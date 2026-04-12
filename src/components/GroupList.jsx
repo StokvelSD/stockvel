@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 function GroupList() {
@@ -8,6 +9,7 @@ function GroupList() {
   const [requestingGroupId, setRequestingGroupId] = useState(null);
   const [messageMap, setMessageMap] = useState({}); // { groupId: { type, text } }
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchGroups();
@@ -48,9 +50,9 @@ function GroupList() {
     }, 4000);
   };
 
-  const handleJoinRequest = async (groupId) => {
+  const handleJoinGroup = async (groupId) => {
     if (!user) {
-      setMessage(groupId, 'error', 'Please log in to send join requests');
+      setMessage(groupId, 'error', 'Please log in to join');
       return;
     }
 
@@ -70,12 +72,18 @@ function GroupList() {
         body: JSON.stringify({ userId: user.uid }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send join request');
+        throw new Error(data.error || 'Failed to join group');
       }
 
-      setMessage(groupId, 'success', 'Join request sent successfully!');
+      setMessage(groupId, 'success', data.message);
+      
+      // Refetch groups to update member count and button state
+      setTimeout(() => {
+        fetchGroups();
+      }, 500);
     } catch (err) {
       setMessage(groupId, 'error', err.message);
     } finally {
@@ -91,12 +99,15 @@ function GroupList() {
       {groups.map(group => {
         const msg = messageMap[group.id];
         const isRequesting = requestingGroupId === group.id;
+        const isFull = (group.members ? group.members.length : 0) >= group.maxMembers;
+        const isMember = group.members && group.members.includes(user?.uid);
 
         return (
           <div key={group.id} className="dashboard-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <h3>{group.groupName}</h3>
               <p>Contribution: R{group.contributionAmount}</p>
+              <p>Members: {group.members ? group.members.length : 0} / {group.maxMembers}</p>
               <small>Created: {new Date(group.createdAt).toLocaleDateString()}</small>
               {msg && (
                 <div style={{
@@ -112,19 +123,22 @@ function GroupList() {
               )}
             </div>
             <button
-              onClick={() => handleJoinRequest(group.id)}
-              disabled={isRequesting || msg?.type === 'success'}
+              onClick={isMember ? () => navigate(`/group/${group.id}`) : () => handleJoinGroup(group.id)}
+              disabled={isRequesting || msg?.type === 'success' || isFull}
               style={{
-                background: msg?.type === 'success' ? '#84d384' : 'var(--green)',
+                background: msg?.type === 'success' ? '#22c55e' : isFull ? '#94a3b8' : '#16a34a',
                 color: 'white',
                 border: 'none',
-                padding: '0.5rem 1rem',
+                padding: '0.75rem 1.5rem',
                 borderRadius: '5px',
-                cursor: isRequesting || msg?.type === 'success' ? 'not-allowed' : 'pointer',
-                opacity: isRequesting || msg?.type === 'success' ? 0.6 : 1
+                fontWeight: '600',
+                fontSize: '0.95rem',
+                cursor: isRequesting || msg?.type === 'success' || isFull ? 'not-allowed' : 'pointer',
+                opacity: isRequesting || msg?.type === 'success' || isFull ? 0.6 : 1,
+                whiteSpace: 'nowrap'
               }}
             >
-              {isRequesting ? 'Sending...' : msg?.type === 'success' ? '✓ Requested' : 'Join Group'}
+              {isRequesting ? 'Joining...' : msg?.type === 'success' ? '✓ Joined' : isFull ? 'Full' : isMember ? 'View Group' : 'Join Group'}
             </button>
           </div>
         );
