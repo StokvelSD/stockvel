@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase/firebase';
+import { db, auth } from '../firebase/firebase'; 
 import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth'; 
 import '../index.css';
 
 const isPaidOrCompleted = (status) => ['paid', 'completed', 'confirmed'].includes((status || '').toLowerCase());
@@ -18,16 +19,31 @@ export default function TreasurerDashboard() {
   const currentGroupId = 'group_001';
 
   useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(collection(db, 'contributions'));
-        setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (e) { console.error(e); }
-      finally { setLoading(false); }
-    })();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const snap = await getDocs(collection(db, 'contributions'));
+          setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        } catch (e) { 
+          console.error(e); 
+        } finally { 
+          setLoading(false); 
+        }
+      } else {
+        setLoading(false); 
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const totalCollected = contributions.filter(c => isPaidOrCompleted(c.status)).reduce((s, c) => s + Number(c.amount || 0), 0);
+  const totalCollected = contributions
+    .filter(c => isPaidOrCompleted(c.status))
+    .reduce((s, c) => {
+      const cleanAmount = String(c.amount || '0').replace(/[^0-9.]/g, '');
+      return s + Number(cleanAmount);
+    }, 0);
+
   const pendingCount   = contributions.filter(c => !isPaidOrCompleted(c.status)).length;
   const nextRotation   = 'May 2025';
 
@@ -132,11 +148,16 @@ export default function TreasurerDashboard() {
               {contributions.map(c => {
                 const paid = isPaidOrCompleted(c.status);
                 const confTime = formatTimestamp(c.confirmedAt);
+                
+                const safeDate = formatTimestamp(c.date) || c.date; 
+                
+                const displayAmount = String(c.amount || '0').replace(/[^0-9.]/g, ''); 
+
                 return (
                   <tr key={c.id}>
                     <td><strong>{c.member || c.userId || 'Unknown'}</strong></td>
-                    <td>R {c.amount}</td>
-                    <td style={{ color: '#64748b' }}>{c.date || '—'}</td>
+                    <td>R {displayAmount}</td>
+                    <td style={{ color: '#64748b' }}>{typeof safeDate === 'string' ? safeDate : '—'}</td>
                     <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{confTime || '—'}</td>
                     <td style={{ color: '#64748b' }}>{c.paymentMethod || '—'}</td>
                     <td>

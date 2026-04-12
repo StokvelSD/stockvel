@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase/firebase"; // adjust path to your firebase config
 import {
@@ -19,6 +20,7 @@ function GroupList() {
   const [requestingGroupId, setRequestingGroupId] = useState(null);
   const [messageMap, setMessageMap] = useState({});
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchGroups();
@@ -53,7 +55,7 @@ function GroupList() {
     setTimeout(() => clearMessage(groupId), 4000);
   };
 
-  const handleJoinRequest = async (groupId) => {
+  const handleJoinGroup = async (groupId) => {
     if (!user) {
       setMessage(groupId, "error", "Please log in to send join requests");
       return;
@@ -104,6 +106,8 @@ function GroupList() {
       {groups.map((group) => {
         const msg = messageMap[group.id];
         const isRequesting = requestingGroupId === group.id;
+        const isFull = (group.members ? group.members.length : 0) >= group.maxMembers;
+        const isMember = group.members && group.members.includes(user?.uid);
 
         return (
           <div
@@ -114,6 +118,7 @@ function GroupList() {
             <div>
               <h3>{group.groupName}</h3>
               <p>Contribution: R{group.contributionAmount}</p>
+              <p>Members: {group.members ? group.members.length : 0} / {group.maxMembers}</p>
               <small>Created: {new Date(group.createdAt).toLocaleDateString()}</small>
               {msg && (
                 <div

@@ -30,6 +30,7 @@ const createGroup = async (req, res) => {
       meetingFrequency,
       duration: Number(duration),
       payoutOrder,
+      members: [],
       createdAt: new Date(),
     });
 
@@ -59,47 +60,100 @@ const getGroups = async (req, res) => {
   }
 };
 
-const createJoinRequest = async (req, res) => {
+const getGroupById = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { userId } = req.body; // Assuming userId is sent in body, later from auth
+    
+    if (!groupId) {
+      return res.status(400).json({ error: "Group ID is required" });
+    }
+    
+    const groupDoc = await db.collection("groups").doc(groupId).get();
+
+    if (!groupDoc.exists) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const data = groupDoc.data();
+    const group = {
+      id: groupDoc.id,
+      ...data,
+      createdAt: data.createdAt?.toDate?.() ?? new Date(),
+    };
+
+    res.status(200).json(group);
+  } catch (error) {
+    console.error("getGroupById error:", error.message);
+    res.status(500).json({ error: "Failed to fetch group" });
+  }
+};
+
+const joinGroup = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { userId } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // Check if group exists
-    const groupDoc = await db.collection("groups").doc(groupId).get();
-    if (!groupDoc.exists) {
+    // Validate user exists in the system
+    const userDoc = await db.collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const groupRef = db.collection("groups").doc(groupId);
+
+    // Use transaction to prevent race conditions and ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      const groupDoc = await transaction.get(groupRef);
+
+      if (!groupDoc.exists) {
+        throw new Error("Group not found");
+      }
+
+      const groupData = groupDoc.data();
+
+      // Check if user is already a member
+      if (groupData.members && groupData.members.includes(userId)) {
+        throw new Error("You are already a member of this group");
+      }
+
+      // Check if group is full
+      const currentMembers = groupData.members ? groupData.members.length : 0;
+      if (currentMembers >= groupData.maxMembers) {
+        throw new Error("Group is full");
+      }
+
+      // Add user directly to group members using arrayUnion (atomic, prevents duplicates)
+      transaction.update(groupRef, {
+        members: require("firebase-admin").firestore.FieldValue.arrayUnion(userId)
+      });
+    });
+
+    res.status(201).json({ message: "Successfully joined the group!" });
+  } catch (error) {
+    console.error("joinGroup error:", error.message);
+
+    // Handle specific errors
+    if (error.message.includes("already a member")) {
+      return res.status(400).json({ error: "You are already a member of this group" });
+    }
+    if (error.message.includes("Group is full")) {
+      return res.status(400).json({ error: "Group is full" });
+    }
+    if (error.message.includes("Group not found")) {
       return res.status(404).json({ error: "Group not found" });
     }
 
-    // Check if join request already exists
-    const existingRequest = await db
-      .collection("joinRequests")
-      .where("groupId", "==", groupId)
-      .where("userId", "==", userId)
-      .get();
-    if (!existingRequest.empty) {
-      return res.status(400).json({ error: "Join request already sent" });
-    }
-
-    await db.collection("joinRequests").add({
-      groupId,
-      userId,
-      status: "pending",
-      createdAt: new Date(),
-    });
-
-    res.status(201).json({ message: "Join request sent successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Failed to send join request" });
+    res.status(500).json({ error: "Failed to join group" });
   }
 };
 
 module.exports = {
   createGroup,
   getGroups,
-  createJoinRequest,
+  getGroupById,
+  joinGroup,
 };

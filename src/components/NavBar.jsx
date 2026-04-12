@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import '../index.css';
-
+import Dashboard from '../pages/Dashboard';
 const Navbar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -29,6 +29,7 @@ const Navbar = () => {
 
         {user ? (
           <>
+            <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>Dashboard</Link>
             <Link to="/browse-groups" className="nav-link" onClick={() => setIsOpen(false)}>Browse Groups</Link>
             <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>Add Contribution</Link>
             {user.role === 'admin' && <Link to="/admin" className="nav-link" onClick={() => setIsOpen(false)}>Admin Panel</Link>}
