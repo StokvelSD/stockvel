@@ -13,12 +13,9 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
-// ✅ Handle preflight FIRST, before any other middleware
-app.options("*", cors(corsOptions));
+app.options("(.*)", cors(corsOptions));
 
-// ✅ Apply CORS with the same config to all routes
 app.use(cors(corsOptions));
-
 app.use(express.json());
 app.use("/api/groups", groupRoutes);
 
