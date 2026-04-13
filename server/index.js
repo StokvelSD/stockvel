@@ -7,16 +7,17 @@ const groupRoutes = require("./routes/groups");
 
 const app = express();
 
-app.use(
-  cors({
-    origin: [/^http:\/\/localhost:\d+$/, "https://stokvel-b920c.web.app"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  }),
-);
+const corsOptions = {
+  origin: [/^http:\/\/localhost:\d+$/, "https://stokvel-b920c.web.app"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-//  IMPORTANT FIX
-app.options("*", cors());
+// ✅ Handle preflight FIRST, before any other middleware
+app.options("*", cors(corsOptions));
+
+// ✅ Apply CORS with the same config to all routes
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use("/api/groups", groupRoutes);
