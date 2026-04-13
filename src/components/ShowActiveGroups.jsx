@@ -8,7 +8,9 @@ function ShowActiveGroup() {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const response = await fetch("http://localhost:5000/api/groups");
+        const response = await fetch(
+          "https://stockvel-2kvp.onrender.com/api/groups",
+        );
         if (!response.ok) throw new Error("Failed to fetch groups");
         const data = await response.json();
         setGroups(data);

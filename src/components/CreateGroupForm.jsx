@@ -23,21 +23,24 @@ function CreateGroupForm() {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5000/api/groups", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "https://stockvel-2kvp.onrender.com/api/groups",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            groupName,
+            description,
+            maxMembers,
+            contributionAmount: contribution,
+            meetingFrequency: frequency,
+            duration,
+            payoutOrder,
+          }),
         },
-        body: JSON.stringify({
-          groupName,
-          description,
-          maxMembers,
-          contributionAmount: contribution,
-          meetingFrequency: frequency,
-          duration,
-          payoutOrder,
-        }),
-      });
+      );
 
       const data = await response.json();
 
