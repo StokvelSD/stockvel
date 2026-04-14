@@ -1,14 +1,42 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../firebase/firebase';
 import '../index.css';
-import Dashboard from '../pages/Dashboard';
+
 const Navbar = () => {
-  const { user, logout } = useAuth();
+  const { user, role, logout, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
-  const handleLogout = () => { logout(); navigate('/'); setIsOpen(false); };
+  // Auto redirect to home if trying to access protected routes without login
+  useEffect(() => {
+    const protectedRoutes = ['/dashboard', '/admin', '/treasurer', '/contributions', '/add-contribution', '/browse-groups'];
+    const isProtectedRoute = protectedRoutes.some(route => location.pathname.startsWith(route));
+    
+    // If no user is logged in and trying to access protected route, redirect to home
+    if (!loading && !user && isProtectedRoute) {
+      navigate('/');
+    }
+  }, [user, loading, location, navigate]);
+
+  const handleLogout = async () => { 
+    await logout(); 
+    navigate('/'); 
+    setIsOpen(false); 
+  };
+
+  // Determine user role from the context
+  const userRole = role || (user ? 'user' : null);
+  const isAdmin = userRole === 'admin';
+  const isTreasurer = userRole === 'treasurer';
+  const isRegularUser = userRole === 'user';
+
+  // Don't render anything while checking auth state
+  if (loading) {
+    return null;
+  }
 
   return (
     <nav className="navbar">
@@ -29,18 +57,71 @@ const Navbar = () => {
 
         {user ? (
           <>
-            <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>Dashboard</Link>
-            <Link to="/browse-groups" className="nav-link" onClick={() => setIsOpen(false)}>Browse Groups</Link>
-            <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>Add Contribution</Link>
-            {user.role === 'admin' && <Link to="/admin" className="nav-link" onClick={() => setIsOpen(false)}>Admin Panel</Link>}
-            {user.role === 'treasurer' && <Link to="/treasurer" className="nav-link" onClick={() => setIsOpen(false)}>Treasurer Panel</Link>}
-            {(user.role === 'user' || user.role === 'general') && <Link to="/dashboard" className="nav-link" onClick={() => setIsOpen(false)}>My Dashboard</Link>}
+            {/* Role-specific dashboards - only show the correct one */}
+            {isAdmin && (
+              <Link to="/admin" className="nav-link" onClick={() => setIsOpen(false)}>
+                Admin Dashboard
+              </Link>
+            )}
+            
+            {isTreasurer && (
+              <Link to="/treasurer" className="nav-link" onClick={() => setIsOpen(false)}>
+                Treasurer Dashboard
+              </Link>
+            )}
+            
+            {isRegularUser && (
+              <Link to="/dashboard" className="nav-link" onClick={() => setIsOpen(false)}>
+                My Dashboard
+              </Link>
+            )}
+
+            {/* Common links for all logged-in users */}
+            <Link to="/browse-groups" className="nav-link" onClick={() => setIsOpen(false)}>
+              Browse Groups
+            </Link>
+            
+            <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>
+              Contributions
+            </Link>
+            
+            <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>
+              Add Contribution
+            </Link>
+
+            {/* Treasurer-specific links */}
+            {isTreasurer && (
+              <Link to="/treasurer/manage" className="nav-link" onClick={() => setIsOpen(false)}>
+                Manage Payments
+              </Link>
+            )}
+
+            {/* Admin-specific links */}
+            {isAdmin && (
+              <>
+                <Link to="/admin/users" className="nav-link" onClick={() => setIsOpen(false)}>
+                  Manage Users
+                </Link>
+                <Link to="/admin/groups" className="nav-link" onClick={() => setIsOpen(false)}>
+                  Manage Groups
+                </Link>
+              </>
+            )}
+            
             <span className="navbar-divider" aria-hidden="true"/>
+            
             <span className="navbar-user-badge">
-              {user.email.split('@')[0]}
-              <span className="navbar-role-pill">{user.role}</span>
+              {user.displayName || user.email?.split('@')[0]}
+              <span className="navbar-role-pill" style={{
+                background: isAdmin ? '#dc2626' : isTreasurer ? '#f59e0b' : '#10b981'
+              }}>
+                {userRole}
+              </span>
             </span>
-            <button className="navbar-signout-btn" onClick={handleLogout}>Sign out</button>
+            
+            <button className="navbar-signout-btn" onClick={handleLogout}>
+              Sign out
+            </button>
           </>
         ) : (
           <>

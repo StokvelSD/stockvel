@@ -5,16 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import '../index.css';
 
 const ROLES = ['user', 'treasurer', 'admin'];
-import Header from "../components/Header";
-import Wallet from "../components/Wallet";
-import Actions from "../components/Actions";
-import BottomNav from "../components/BottomNav";
-import ShowActiveGroup from "../components/ShowActiveGroups";
 
 function AdminPage() {
   const [users, setUsers]       = useState([]);
   const [loading, setLoading]   = useState(true);
-  const [updating, setUpdating] = useState(null); // userId being updated
+  const [updating, setUpdating] = useState(null);
   const [search, setSearch]     = useState('');
   const navigate = useNavigate();
 
@@ -33,24 +28,23 @@ function AdminPage() {
     fetchUsers();
   }, []);
 
-
   const handleRoleChange = async (userId, newRole, currentRole) => {
-  const userName = users.find(u => u.id === userId)?.name || 'this user';
-  const confirmed = window.confirm(
-    `Change "${userName}" from "${currentRole}" to "${newRole}"?\n\nThis will affect their access immediately.`
-  );
-  if (!confirmed) return;
+    const userName = users.find(u => u.id === userId)?.name || 'this user';
+    const confirmed = window.confirm(
+      `Change "${userName}" from "${currentRole}" to "${newRole}"?\n\nThis will affect their access immediately.`
+    );
+    if (!confirmed) return;
 
-  setUpdating(userId);
-  try {
-    await updateDoc(doc(db, 'users', userId), { role: newRole });
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-  } catch (err) {
-    alert('Failed to update role. Please try again.');
-  } finally {
-    setUpdating(null);
-  }
-};
+    setUpdating(userId);
+    try {
+      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+    } catch (err) {
+      alert('Failed to update role. Please try again.');
+    } finally {
+      setUpdating(null);
+    }
+  };
 
   const filtered = users.filter(u =>
     (u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -67,14 +61,11 @@ function AdminPage() {
   return (
     <div className="dashboard-page">
       <div className="dashboard-inner">
-
-        {/* Header */}
         <div className="dashboard-header">
           <h2>Admin Dashboard</h2>
           <p>Manage users, assign roles, and oversee all stokvel groups.</p>
         </div>
 
-        {/* Stats */}
         <div className="stats-grid" style={{ marginBottom: '2rem' }}>
           <div className="stat-card accent-blue">
             <div className="stat-label">Total users</div>
@@ -98,7 +89,7 @@ function AdminPage() {
           </div>
         </div>
 
-        {/* Quick actions */}
+        {/* Quick actions - removed Browse groups button since it's in BottomNav */}
         <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => navigate('/create-group')}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -108,9 +99,6 @@ function AdminPage() {
           </button>
           <button className="btn btn-outline" onClick={() => navigate('/configure-group')}>
             Configure group
-          </button>
-          <button className="btn btn-outline" onClick={() => navigate('/browse-groups')}>
-            Browse groups
           </button>
         </div>
 
@@ -136,7 +124,7 @@ function AdminPage() {
             <p style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>No users found.</p>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="table">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -171,7 +159,7 @@ function AdminPage() {
                       </td>
                       <td>
                         <span className={`badge ${
-                          u.role === 'admin'     ? 'badge-danger' :
+                          u.role === 'admin' ? 'badge-danger' :
                           u.role === 'treasurer' ? 'badge-warning' :
                           'badge-info'
                         }`}>
@@ -203,9 +191,6 @@ function AdminPage() {
             </div>
           )}
         </div>
-
-        
-
       </div>
     </div>
   );
