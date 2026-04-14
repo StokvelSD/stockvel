@@ -18,6 +18,9 @@ function BrowseGroupsPage() {
   const [joinRequests, setJoinRequests] = useState([]);
   const [showJoinRequests, setShowJoinRequests] = useState(false);
   const [processingRequest, setProcessingRequest] = useState(null);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
+  const [selectedGroupForMembers, setSelectedGroupForMembers] = useState(null);
+  const [groupMembers, setGroupMembers] = useState([]);
 
   const userRole = role || (user ? 'user' : null);
   const isAdmin = userRole === 'admin';
@@ -74,6 +77,33 @@ function BrowseGroupsPage() {
     } catch (err) {
       console.error('Failed to fetch join requests:', err);
     }
+  };
+
+  const fetchGroupMembers = async (groupId) => {
+    try {
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (groupDoc.exists()) {
+        const groupData = groupDoc.data();
+        const memberIds = groupData.members || [];
+        const membersData = [];
+        
+        for (const memberId of memberIds) {
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            membersData.push({ id: memberId, ...userDoc.data() });
+          }
+        }
+        setGroupMembers(membersData);
+      }
+    } catch (err) {
+      console.error('Failed to fetch group members:', err);
+    }
+  };
+
+  const handleViewGroupMembers = async (group) => {
+    setSelectedGroupForMembers(group);
+    await fetchGroupMembers(group.id);
+    setShowGroupMembers(true);
   };
 
   const handleAddParticipant = async (groupId, userId, userName, groupName) => {
@@ -278,6 +308,101 @@ function BrowseGroupsPage() {
     );
   }
 
+  // View Group Members Modal
+  if (showGroupMembers && selectedGroupForMembers) {
+    return (
+      <div className="dashboard-page">
+        <div className="dashboard-inner">
+          <div style={{ marginBottom: '1.5rem' }}>
+            <button 
+              className="btn btn-outline"
+              onClick={() => {
+                setShowGroupMembers(false);
+                setSelectedGroupForMembers(null);
+                setGroupMembers([]);
+              }}
+            >
+              ← Back to Groups
+            </button>
+          </div>
+
+          <div className="section-card">
+            <h2>{selectedGroupForMembers.groupName || selectedGroupForMembers.name}</h2>
+            <h3>👥 Group Members ({groupMembers.length})</h3>
+            
+            {groupMembers.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                No members in this group yet
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {groupMembers.map((member, index) => (
+                  <div 
+                    key={member.id} 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.75rem 1rem',
+                      backgroundColor: member.id === user?.uid ? '#f0f9ff' : 'white',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        backgroundColor: member.role === 'admin' ? '#dc2626' : member.role === 'treasurer' ? '#f59e0b' : '#10b981',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        fontSize: '1rem'
+                      }}>
+                        {(member.name?.[0] || member.email?.[0] || '?').toUpperCase()}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>
+                          {member.name} {member.surname || ''}
+                          {member.id === user?.uid && (
+                            <span style={{ 
+                              marginLeft: '0.5rem', 
+                              fontSize: '0.7rem', 
+                              padding: '0.2rem 0.5rem', 
+                              borderRadius: '12px',
+                              backgroundColor: '#e0e7ff',
+                              color: '#4338ca'
+                            }}>
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                          {member.email}
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`badge ${
+                        member.role === 'admin' ? 'badge-danger' :
+                        member.role === 'treasurer' ? 'badge-warning' : 'badge-info'
+                      }`}>
+                        {member.role || 'member'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Join Requests View
   if (showJoinRequests && (isAdmin || isTreasurer)) {
     return (
@@ -405,6 +530,14 @@ function BrowseGroupsPage() {
                     </div>
                     
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {/* View Group Button */}
+                      <button 
+                        className="btn btn-outline"
+                        onClick={() => handleViewGroupMembers(group)}
+                      >
+                        View Group
+                      </button>
+                      
                       {/* Admin/Treasurer: Add Participant button */}
                       {(isAdmin || isTreasurer) && (
                         <button 

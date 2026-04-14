@@ -57,7 +57,7 @@ const Navbar = () => {
 
         {user ? (
           <>
-            {/* Role-specific dashboards - only show the correct one */}
+            {/* Role-specific dashboards */}
             {isAdmin && (
               <Link to="/admin" className="nav-link" onClick={() => setIsOpen(false)}>
                 Admin Dashboard
@@ -76,18 +76,23 @@ const Navbar = () => {
               </Link>
             )}
 
-            {/* Common links for all logged-in users */}
+            {/* Browse Groups - visible to all logged in users */}
             <Link to="/browse-groups" className="nav-link" onClick={() => setIsOpen(false)}>
               Browse Groups
             </Link>
-            
-            <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>
-              Contributions
-            </Link>
-            
-            <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>
-              Add Contribution
-            </Link>
+
+            {/* Contributions - ONLY for regular users and treasurers, NOT for admin */}
+            {!isAdmin && (
+              <>
+                <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>
+                  Contributions
+                </Link>
+                
+                <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>
+                  Add Contribution
+                </Link>
+              </>
+            )}
 
             {/* Treasurer-specific links */}
             {isTreasurer && (
@@ -96,17 +101,8 @@ const Navbar = () => {
               </Link>
             )}
 
-            {/* Admin-specific links */}
-            {isAdmin && (
-              <>
-                <Link to="/admin/users" className="nav-link" onClick={() => setIsOpen(false)}>
-                  Manage Users
-                </Link>
-                <Link to="/admin/groups" className="nav-link" onClick={() => setIsOpen(false)}>
-                  Manage Groups
-                </Link>
-              </>
-            )}
+            {/* Admin-specific links - REMOVED Manage Users and Manage Groups */}
+            {/* Admin only sees Admin Dashboard and Browse Groups */}
             
             <span className="navbar-divider" aria-hidden="true"/>
             

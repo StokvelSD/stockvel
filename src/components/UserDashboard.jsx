@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase/firebase";
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, arrayUnion, query, where } from "firebase/firestore";
+import MyGroups from "../components/MyGroups";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -391,6 +392,12 @@ const UserDashboard = () => {
           </div>
         </div>
 
+        {/* My Groups Section */}
+        <div className="section-card" style={{ marginBottom: '2rem' }}>
+          <h3>📋 My Groups</h3>
+          <MyGroups />
+        </div>
+
         {/* Upcoming payments */}
         <div className="section-card" style={{ marginBottom: '2rem' }}>
           <h3>📆 Upcoming Payments</h3>
@@ -398,7 +405,7 @@ const UserDashboard = () => {
             <p>No upcoming payments. You're all caught up!</p>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="table">
                 <thead>
                   <tr>
                     <th>Amount</th>
@@ -427,7 +434,7 @@ const UserDashboard = () => {
             <p>No payments yet. Make your first contribution!</p>
           ) : (
             <div className="table-wrap">
-              <table>
+              <table className="table">
                 <thead>
                   <tr>
                     <th>Date</th>

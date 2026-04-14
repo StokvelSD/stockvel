@@ -7,6 +7,8 @@ import {
 import NavBar from "./components/NavBar.jsx";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
+import GroupDetails from './components/GroupDetails';
+
 import Register from "./components/Register";
 import AdminDashboard from "./components/AdminDashboard";
 import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
@@ -70,7 +72,9 @@ function App() {
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
-          <Route path="/group/:groupId" element={<GroupDetailsPage />} />
+
+
+          <Route path="/group/:id" element={<GroupDetails />} />
 
           <Route path="/unauthorized" element={<h2>Access Denied</h2>} />
           <Route path="*" element={<Navigate to="/" />} />
