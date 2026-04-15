@@ -12,7 +12,7 @@ const createGroup = async (req, res) => {
       payoutOrder,
     } = req.body;
 
-    // ✅ Fixed: was !groupName.trim() === '' which is always false
+    
     if (!groupName || groupName.trim() === "") {
       return res.status(400).json({ error: "Group name is required" });
     }
@@ -49,7 +49,7 @@ const getGroups = async (req, res) => {
       return {
         id: doc.id,
         ...data,
-        // ✅ Fixed: safely handle missing or malformed createdAt
+        
         createdAt: data.createdAt?.toDate?.() ?? new Date(),
       };
     });
@@ -59,6 +59,8 @@ const getGroups = async (req, res) => {
     res.status(500).json({ message: "Failed to fetch groups" });
   }
 };
+
+
 
 const getGroupById = async (req, res) => {
   try {
@@ -151,9 +153,70 @@ const joinGroup = async (req, res) => {
   }
 };
 
+const scheduleMeeting = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const {title, date, location, agenda } = req.body;
+    const adminId = req.user.id; 
+
+    if (!title || !date || !location || !agenda) {
+      return res.status(400).json({ error: "All meeting details are required" });
+    }
+
+    const groupRef = db.collection("groups").doc(groupId);
+    const groupDoc = await groupRef.get();  
+    if (!groupDoc.exists) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const meeting = {
+      groupId,
+      title,
+      date: new Date(date),
+      agenda: agenda || "",
+      minutes: "",
+      status: "scheduled",
+      createdBy: adminId,
+      createdAt: new Date(),
+    };
+
+    const docRef = await db.collection("meetings").add(meeting);
+    res.status(201).json({ message: "Meeting scheduled successfully", meetingId: docRef.id });
+  } catch (error) {
+    console.error("scheduleMeeting error:", error);
+    res.status(500).json({ error: "Failed to schedule meeting" });
+  }
+};
+
+
+const getGroupAnnouncements = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const{limit = 20, offset = 0} = req.query;
+
+    const snapshot = await db.collection("announcements")
+      .where("groupId", "==", groupId)
+      .orderBy("createdAt", "desc")
+      .limit(Number(limit))
+      .get();
+    const announcements = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data
+      };
+    });
+    res.status(200).json(announcements);
+  } catch (error) {
+    console.error("getGroupAnnouncements error:", error);
+    res.status(500).json({ error: "Failed to fetch announcements" });
+  }
+};
 module.exports = {
   createGroup,
   getGroups,
   getGroupById,
   joinGroup,
+  scheduleMeeting,
+  getGroupAnnouncements
 };
