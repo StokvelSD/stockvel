@@ -20,22 +20,8 @@ const ThingsList = () => {
 
     loadData();
   }, []);
-const formatFirestoreDate = (timestamp) => {
-  if (!timestamp?._seconds) return "";
-
-  const date = new Date(timestamp._seconds * 1000);
-
-  return `${date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })} at ${date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  })}`;
-};
+    
+console.log("raw date:", contributions[0]?.date);
   if (loading) return <p>Loading contributions...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
 
@@ -50,7 +36,18 @@ contributions.map((c) => (
     <p><strong>Status:</strong> {c.status}</p>
 
 <p>
-  <strong>Date:</strong> {formatFirestoreDate(c.date)}
+<strong>Date:</strong>{" "}
+{c.date &&
+  `${new Date(c.date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  })} at ${new Date(c.date).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  })}`}
 </p>
   </div>
 ))
