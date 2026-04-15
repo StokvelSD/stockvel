@@ -56,7 +56,7 @@ app.get("/contributions/paid", verifyToken, async (req, res) => {
       return {
         id: doc.id,
         ...d,
-        date: d.date ? new Date(d.date._seconds * 1000).toISOString() : null
+        date: d.date.toDate().toLocaleDateString()
       };
     });
 
