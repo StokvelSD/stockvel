@@ -189,6 +189,70 @@ const scheduleMeeting = async (req, res) => {
 };
 
 
+const addMeetingMinutes = async (req, res) => {
+  try {
+    const { groupId, meetingId } = req.params;
+    const { minutes } = req.body;
+
+    if (!minutes || minutes.trim() === "") {
+      return res.status(400).json({ error: "Meeting minutes are required" });
+    } 
+    const meetingRef = db.collection("meetings").doc(meetingId);
+    const meetingDoc = await meetingRef.get();
+    if (!meetingDoc.exists) {
+      return res.status(404).json({ error: "Meeting not found" });
+    }
+    
+    if(meetingDoc.data().groupId !== groupId) {
+      return res.status(400).json({ error: "Meeting does not belong to the specified group" });
+    }
+
+    await meetingRef.update({
+      minutes: minutes.trim(),
+      status: "completed",
+      completedAt: new Date(),
+    });
+    res.status(200).json({ message: "Meeting minutes added successfully" });
+  } catch (error) {
+    console.error("addMeetingMinutes error:", error);
+    res.status(500).json({ error: "Failed to add meeting minutes" });
+  }
+};
+
+const sendAnnouncement = async (req, res) => {
+  try {
+      const { groupId } = req.params;
+      const { title, message} = req.body;
+      const adminId = req.user?.uid || "admin";
+
+      if (!title || !message) {
+          return res.status(400).json({ error: "Title and message are required" });
+      }
+
+      const groupRef = db.collection("groups").doc(groupId);
+      const groupDoc = await groupRef.get();
+      if (!groupDoc.exists) {
+          return res.status(404).json({ error: "Group not found" });
+      }
+      const announcement = {
+          groupId,
+          title,  
+          message,
+          createdBy: adminId,
+          createdAt: new Date(),
+          readBy: [],
+      };
+
+      const docRef = await db.collection("announcements").add(announcement);
+      res.status(201).json({ message: "Announcement sent successfully", announcementId: docRef.id });
+
+  } catch (error) {
+    console.error("sendAnnouncement error:", error);
+    res.status(500).json({ error: "Failed to send announcement" });
+  }
+};
+
+
 const getGroupAnnouncements = async (req, res) => {
   try {
     const { groupId } = req.params;
@@ -218,5 +282,7 @@ module.exports = {
   getGroupById,
   joinGroup,
   scheduleMeeting,
-  getGroupAnnouncements
+  getGroupAnnouncements,
+  sendAnnouncement,
+  addMeetingMinutes
 };
