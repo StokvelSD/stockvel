@@ -4,6 +4,7 @@ require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const groupRoutes = require("./routes/groups");
+const webhookRoutes = require("./routes/webhook");
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.options("/{*path}", cors(corsOptions));
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use("/api/groups", groupRoutes);
+app.use("/api/webhook", webhookRoutes);
 
 const PORT = process.env.PORT || 5000;
 
