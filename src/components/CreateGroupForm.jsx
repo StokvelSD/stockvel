@@ -1,7 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { db } from "../firebase/firebase";
-import { collection, addDoc } from "firebase/firestore";
 
 function CreateGroupForm() {
   const navigate = useNavigate();
@@ -25,30 +23,38 @@ function CreateGroupForm() {
     setError("");
 
     try {
-      // Create group document directly in Firebase
-      const groupData = {
-        groupName,
-        description,
-        maxMembers: Number(maxMembers),
-        contributionAmount: Number(contribution),
-        meetingFrequency: frequency,
-        duration: Number(duration),
-        payoutOrder,
-        members: [], // Start with empty members array
-        memberCount: 0,
-        createdAt: new Date(),
-        status: "active"
-      };
+      const response = await fetch(
+        "https://stockvel-2kvp.onrender.com/api/groups",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            groupName,
+            description,
+            maxMembers,
+            contributionAmount: contribution,
+            meetingFrequency: frequency,
+            duration,
+            payoutOrder,
+          }),
+        },
+      );
 
-      await addDoc(collection(db, "groups"), groupData);
+      const data = await response.json();
 
-      // Redirect with success message
-      navigate("/admin", {
-        state: { message: "Stokvel group created successfully!" },
-      });
+      if (response.ok) {
+        // Redirect with success message
+        navigate("/admin", {
+          state: { message: "Stokvel group created successfully!" },
+        });
+      } else {
+        setError(data.message || "Failed to create group");
+      }
     } catch (err) {
-      console.error("Error creating group:", err);
-      setError(err.message || "Could not create group");
+      console.error(err);
+      setError("Could not connect to server");
     } finally {
       setLoading(false);
     }
@@ -57,7 +63,7 @@ function CreateGroupForm() {
   return (
     <main>
       <section>
-        <button className="back-btn" onClick={() => navigate("/admin")}>
+        <button className="back-btn" onClick={() => navigate("/")}>
           ←
         </button>
       </section>
@@ -129,6 +135,7 @@ function CreateGroupForm() {
               required
             />
 
+            {/*  FIXED DROPDOWN */}
             <label htmlFor="payout-order">Payout Order</label>
             <select
               id="payout-order"
@@ -142,9 +149,11 @@ function CreateGroupForm() {
               <option value="first">First joined</option>
             </select>
 
+            {/* Error display */}
             {error && <p className="error">{error}</p>}
           </section>
 
+          {/* Loading state */}
           <button type="submit" className="submit-btn" disabled={loading}>
             {loading ? "Creating..." : "Create Group"}
           </button>
