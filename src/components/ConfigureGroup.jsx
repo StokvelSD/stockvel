@@ -1,10 +1,9 @@
 import { useState, useEffect } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 
-//  Reusable Field wrapper
-
+// Reusable Field wrapper
 function Field({ label, children, isLast }) {
   return (
     <section className={`field ${isLast ? "field-last" : ""}`}>
@@ -14,8 +13,7 @@ function Field({ label, children, isLast }) {
   );
 }
 
-//  Reusable Select wrapper
-
+// Reusable Select wrapper
 function SelectField({ label, id, options, value, onChange, isLast }) {
   return (
     <Field label={label} isLast={isLast}>
@@ -40,8 +38,7 @@ function SelectField({ label, id, options, value, onChange, isLast }) {
   );
 }
 
-//  VIEW 2 — Configure form for a selected group
-
+// VIEW 2 — Configure form for a selected group
 function ConfigureForm({ group, onBack }) {
   const [payoutOrder, setPayoutOrder] = useState(group.payoutOrder || "");
   const [latePenalty, setLatePenalty] = useState(group.latePenalty || "");
@@ -78,7 +75,7 @@ function ConfigureForm({ group, onBack }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      console.error(err);
+      console.error("Error saving group config:", err);
       alert("Failed to save changes. Please try again.");
     } finally {
       setSaving(false);
@@ -88,7 +85,6 @@ function ConfigureForm({ group, onBack }) {
   return (
     <section className="body">
       <section className="page">
-        {/* ── Header ── */}
         <section className="header">
           <button className="back-btn" onClick={onBack}>
             &#8592;
@@ -98,7 +94,6 @@ function ConfigureForm({ group, onBack }) {
 
         <p className="group-name">{group.groupName}</p>
 
-        {/* ── Success banner ── */}
         {saved && (
           <div
             style={{
@@ -116,7 +111,6 @@ function ConfigureForm({ group, onBack }) {
           </div>
         )}
 
-        {/* ── Payout Rules ── */}
         <section className="card">
           <p className="card-title">Payout rules</p>
 
@@ -164,7 +158,6 @@ function ConfigureForm({ group, onBack }) {
           </Field>
         </section>
 
-        {/* ── Meeting Schedule ── */}
         <section className="card">
           <p className="card-title">Meeting schedule</p>
 
@@ -192,7 +185,6 @@ function ConfigureForm({ group, onBack }) {
           />
         </section>
 
-        {/* ── Broadcast Announcement ── */}
         <section className="card">
           <p className="card-title">Broadcast announcement</p>
 
@@ -211,7 +203,6 @@ function ConfigureForm({ group, onBack }) {
           </Field>
         </section>
 
-        {/* ── Save button ── */}
         <button
           className="save-btn"
           onClick={handleSave}
@@ -225,8 +216,7 @@ function ConfigureForm({ group, onBack }) {
   );
 }
 
-//  VIEW 1 — List of all active groups
-
+// VIEW 1 — List of all active groups (UPDATED to use Firebase)
 function GroupList({ onSelect }) {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -235,13 +225,15 @@ function GroupList({ onSelect }) {
   useEffect(() => {
     const fetchGroups = async () => {
       try {
-        const res = await fetch(
-          "https://stockvel-2kvp.onrender.com/api/groups",
-        );
-        if (!res.ok) throw new Error("Failed to fetch groups");
-        const data = await res.json();
-        setGroups(data);
+        // Using Firebase directly instead of API
+        const groupsSnap = await getDocs(collection(db, 'groups'));
+        const groupsData = groupsSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setGroups(groupsData);
       } catch (err) {
+        console.error("Error fetching groups:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -315,7 +307,6 @@ function GroupList({ onSelect }) {
             e.currentTarget.style.borderColor = "";
           }}
         >
-          {/* Top row: name + badges */}
           <section className="active-Member-top">
             <h3 className="active-Member-name">{group.groupName}</h3>
             <div
@@ -338,7 +329,6 @@ function GroupList({ onSelect }) {
             </div>
           </section>
 
-          {/* Stats grid */}
           <section className="active-Member-grid">
             <section className="active-Member-stat">
               <span className="stat-label">Contribution</span>
@@ -364,14 +354,19 @@ function GroupList({ onSelect }) {
             </section>
           </section>
 
-          {/* Created date */}
           <p className="active-Member-date">
             Created{" "}
-            {new Date(group.createdAt).toLocaleDateString("en-ZA", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+            {group.createdAt?.toDate 
+              ? group.createdAt.toDate().toLocaleDateString("en-ZA", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })
+              : new Date(group.createdAt).toLocaleDateString("en-ZA", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
           </p>
         </section>
       ))}
@@ -379,23 +374,20 @@ function GroupList({ onSelect }) {
   );
 }
 
-//  ROOT EXPORT — controls which view is shown
-
-export default function ConfigureGroupPage({ onBack }) {
+// ROOT EXPORT
+export default function ConfigureGroupPage() {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const navigate = useNavigate();
 
-  // Group selected → show configure form
   if (selectedGroup) {
     return (
       <ConfigureForm
         group={selectedGroup}
-        onBack={() => setSelectedGroup(null)} // back = return to group list
+        onBack={() => setSelectedGroup(null)}
       />
     );
   }
 
-  // No group selected → show group list
   return (
     <div className="dashboard-page">
       <div className="dashboard-inner">
