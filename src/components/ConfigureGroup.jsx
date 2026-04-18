@@ -3,7 +3,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 
-//  Reusable Field wrapper
+// ── Reusable Field wrapper
 
 function Field({ label, children, isLast }) {
   return (
@@ -14,7 +14,7 @@ function Field({ label, children, isLast }) {
   );
 }
 
-//  Reusable Select wrapper
+// ── Reusable Select wrapper ──
 
 function SelectField({ label, id, options, value, onChange, isLast }) {
   return (
@@ -40,24 +40,50 @@ function SelectField({ label, id, options, value, onChange, isLast }) {
   );
 }
 
-//  VIEW 2 — Configure form for a selected group
+// ── VIEW 2 — Configure form for a selected group ──
 
 function ConfigureForm({ group, onBack }) {
+  // Group config state
   const [payoutOrder, setPayoutOrder] = useState(group.payoutOrder || "");
   const [latePenalty, setLatePenalty] = useState(group.latePenalty || "");
   const [gracePeriod, setGracePeriod] = useState(group.gracePeriod || "");
   const [meetingFreq, setMeetingFreq] = useState(group.meetingFrequency || "");
   const [meetingDay, setMeetingDay] = useState(group.meetingDay || "");
+
+  // Meeting schedule state
+  const [meetingTitle, setMeetingTitle] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [meetingLocation, setMeetingLocation] = useState("");
+  const [meetingAgenda, setMeetingAgenda] = useState("");
+
+  // Announcement state
+  const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcement, setAnnouncement] = useState("");
+
+  // UI state
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errors, setErrors] = useState({});
 
   const validate = () => {
     const e = {};
+
+    // Payout rules — always required
     if (!latePenalty) e.latePenalty = "This field is required.";
     if (!gracePeriod) e.gracePeriod = "This field is required.";
+
+    // Meeting fields — all required
+    if (!meetingFreq) e.meetingFreq = "This field is required.";
+    if (!meetingDay) e.meetingDay = "This field is required.";
+    if (!meetingTitle) e.meetingTitle = "This field is required.";
+    if (!meetingDate) e.meetingDate = "This field is required.";
+    if (!meetingLocation) e.meetingLocation = "This field is required.";
+    if (!meetingAgenda) e.meetingAgenda = "This field is required.";
+
+    // Announcement fields — all required
+    if (!announcementTitle) e.announcementTitle = "This field is required.";
     if (!announcement) e.announcement = "This field is required.";
+
     return e;
   };
 
@@ -68,6 +94,7 @@ function ConfigureForm({ group, onBack }) {
 
     setSaving(true);
     try {
+      //  Save group config directly to Firestore (groups collection)
       await updateDoc(doc(db, "groups", group.id), {
         payoutOrder,
         latePenalty: Number(latePenalty),
@@ -75,11 +102,62 @@ function ConfigureForm({ group, onBack }) {
         meetingFrequency: meetingFreq,
         meetingDay,
       });
+
+      //  Schedule meeting via backend API (saves to meetings collection)
+      if (meetingTitle && meetingDate) {
+        const meetingRes = await fetch(
+          `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/schedule-meeting`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: meetingTitle,
+              date: new Date(meetingDate).toISOString(),
+              location: meetingLocation || "",
+              agenda: meetingAgenda || "",
+              status: "scheduled",
+            }),
+          },
+        );
+        if (!meetingRes.ok) {
+          const err = await meetingRes.json();
+          console.log("Meeting error from backend:", err);
+          throw new Error(err.error || "Failed to schedule meeting");
+        }
+      }
+
+      // 3 — Send announcement via backend API (saves to announcements collection)
+      if (announcementTitle && announcement.trim()) {
+        const announcementRes = await fetch(
+          `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/announcements`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: announcementTitle,
+              message: announcement,
+            }),
+          },
+        );
+        if (!announcementRes.ok) {
+          const err = await announcementRes.json();
+          throw new Error(err.error || "Failed to send announcement");
+        }
+      }
+
+      // Reset meeting + announcement fields after successful save
+      setMeetingTitle("");
+      setMeetingDate("");
+      setMeetingLocation("");
+      setMeetingAgenda("");
+      setAnnouncementTitle("");
+      setAnnouncement("");
+
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error(err);
-      alert("Failed to save changes. Please try again.");
+      alert(err.message || "Failed to save changes. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -167,14 +245,19 @@ function ConfigureForm({ group, onBack }) {
         {/* ── Meeting Schedule ── */}
         <section className="card">
           <p className="card-title">Meeting schedule</p>
-
           <SelectField
             label="Meeting frequency"
             id="meeting-frequency"
             options={["Select frequency…", "Monthly", "Weekly", "Bi-weekly"]}
             value={meetingFreq}
-            onChange={setMeetingFreq}
+            onChange={(val) => {
+              setMeetingFreq(val);
+              setErrors((prev) => ({ ...prev, meetingFreq: "" }));
+            }}
           />
+          {errors.meetingFreq && (
+            <span className="error">{errors.meetingFreq}</span>
+          )}
 
           <SelectField
             label="Day of meeting"
@@ -187,14 +270,79 @@ function ConfigureForm({ group, onBack }) {
               "Last Sunday",
             ]}
             value={meetingDay}
-            onChange={setMeetingDay}
-            isLast
+            onChange={(val) => {
+              setMeetingDay(val);
+              setErrors((prev) => ({ ...prev, meetingDay: "" }));
+            }}
           />
+          {errors.meetingDay && (
+            <span className="error">{errors.meetingDay}</span>
+          )}
+          <Field label="Meeting title">
+            <input
+              type="text"
+              placeholder="e.g. Monthly check-in"
+              value={meetingTitle}
+              onChange={(e) => {
+                setMeetingTitle(e.target.value);
+                setErrors((prev) => ({ ...prev, meetingTitle: "" }));
+              }}
+            />
+            {errors.meetingTitle && (
+              <span className="error">{errors.meetingTitle}</span>
+            )}
+          </Field>
+
+          <Field label="Meeting date & time">
+            <input
+              type="datetime-local"
+              value={meetingDate}
+              onChange={(e) => {
+                setMeetingDate(e.target.value);
+                setErrors((prev) => ({ ...prev, meetingDate: "" }));
+              }}
+            />
+            {errors.meetingDate && (
+              <span className="error">{errors.meetingDate}</span>
+            )}
+          </Field>
+
+          <Field label="Location">
+            <input
+              type="text"
+              placeholder="e.g. Community hall, Zoom link..."
+              value={meetingLocation}
+              onChange={(e) => setMeetingLocation(e.target.value)}
+            />
+          </Field>
+
+          <Field label="Agenda" isLast>
+            <textarea
+              placeholder="What will be discussed at this meeting?"
+              value={meetingAgenda}
+              onChange={(e) => setMeetingAgenda(e.target.value)}
+            />
+          </Field>
         </section>
 
         {/* ── Broadcast Announcement ── */}
         <section className="card">
           <p className="card-title">Broadcast announcement</p>
+
+          <Field label="Announcement title">
+            <input
+              type="text"
+              placeholder="e.g. Payment reminder"
+              value={announcementTitle}
+              onChange={(e) => {
+                setAnnouncementTitle(e.target.value);
+                setErrors((prev) => ({ ...prev, announcementTitle: "" }));
+              }}
+            />
+            {errors.announcementTitle && (
+              <span className="error">{errors.announcementTitle}</span>
+            )}
+          </Field>
 
           <Field label="Message to all members" isLast>
             <textarea
@@ -225,7 +373,7 @@ function ConfigureForm({ group, onBack }) {
   );
 }
 
-//  VIEW 1 — List of all active groups
+// ── VIEW 1 — List of all active groups ───
 
 function GroupList({ onSelect }) {
   const [groups, setGroups] = useState([]);
@@ -315,7 +463,6 @@ function GroupList({ onSelect }) {
             e.currentTarget.style.borderColor = "";
           }}
         >
-          {/* Top row: name + badges */}
           <section className="active-Member-top">
             <h3 className="active-Member-name">{group.groupName}</h3>
             <div
@@ -338,11 +485,10 @@ function GroupList({ onSelect }) {
             </div>
           </section>
 
-          {/* Stats grid */}
           <section className="active-Member-grid">
             <section className="active-Member-stat">
               <span className="stat-label">Contribution</span>
-              <span className="stat-value">R{group.contributionAmount}</span>
+              <span className="stat-value">R {group.contributionAmount}</span>
             </section>
             <section className="active-Member-stat">
               <span className="stat-label">Frequency</span>
@@ -364,7 +510,6 @@ function GroupList({ onSelect }) {
             </section>
           </section>
 
-          {/* Created date */}
           <p className="active-Member-date">
             Created{" "}
             {new Date(group.createdAt).toLocaleDateString("en-ZA", {
@@ -379,23 +524,21 @@ function GroupList({ onSelect }) {
   );
 }
 
-//  ROOT EXPORT — controls which view is shown
+// ── ROOT EXPORT ──────────────
 
 export default function ConfigureGroupPage({ onBack }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const navigate = useNavigate();
 
-  // Group selected → show configure form
   if (selectedGroup) {
     return (
       <ConfigureForm
         group={selectedGroup}
-        onBack={() => setSelectedGroup(null)} // back = return to group list
+        onBack={() => setSelectedGroup(null)}
       />
     );
   }
 
-  // No group selected → show group list
   return (
     <div className="dashboard-page">
       <div className="dashboard-inner">

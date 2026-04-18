@@ -12,7 +12,6 @@ const createGroup = async (req, res) => {
       payoutOrder,
     } = req.body;
 
-    
     if (!groupName || groupName.trim() === "") {
       return res.status(400).json({ error: "Group name is required" });
     }
@@ -49,7 +48,7 @@ const getGroups = async (req, res) => {
       return {
         id: doc.id,
         ...data,
-        
+
         createdAt: data.createdAt?.toDate?.() ?? new Date(),
       };
     });
@@ -60,16 +59,14 @@ const getGroups = async (req, res) => {
   }
 };
 
-
-
 const getGroupById = async (req, res) => {
   try {
     const { groupId } = req.params;
-    
+
     if (!groupId) {
       return res.status(400).json({ error: "Group ID is required" });
     }
-    
+
     const groupDoc = await db.collection("groups").doc(groupId).get();
 
     if (!groupDoc.exists) {
@@ -130,7 +127,8 @@ const joinGroup = async (req, res) => {
 
       // Add user directly to group members using arrayUnion (atomic, prevents duplicates)
       transaction.update(groupRef, {
-        members: require("firebase-admin").firestore.FieldValue.arrayUnion(userId)
+        members:
+          require("firebase-admin").firestore.FieldValue.arrayUnion(userId),
       });
     });
 
@@ -140,7 +138,9 @@ const joinGroup = async (req, res) => {
 
     // Handle specific errors
     if (error.message.includes("already a member")) {
-      return res.status(400).json({ error: "You are already a member of this group" });
+      return res
+        .status(400)
+        .json({ error: "You are already a member of this group" });
     }
     if (error.message.includes("Group is full")) {
       return res.status(400).json({ error: "Group is full" });
@@ -156,15 +156,17 @@ const joinGroup = async (req, res) => {
 const scheduleMeeting = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const {title, date, location, agenda } = req.body;
-    const adminId = req.user.id; 
+    const { title, date, location, agenda } = req.body;
+    const adminId = req.user?.id || "admin";
 
     if (!title || !date || !location || !agenda) {
-      return res.status(400).json({ error: "All meeting details are required" });
+      return res
+        .status(400)
+        .json({ error: "All meeting details are required" });
     }
 
     const groupRef = db.collection("groups").doc(groupId);
-    const groupDoc = await groupRef.get();  
+    const groupDoc = await groupRef.get();
     if (!groupDoc.exists) {
       return res.status(404).json({ error: "Group not found" });
     }
@@ -181,13 +183,15 @@ const scheduleMeeting = async (req, res) => {
     };
 
     const docRef = await db.collection("meetings").add(meeting);
-    res.status(201).json({ message: "Meeting scheduled successfully", meetingId: docRef.id });
+    res.status(201).json({
+      message: "Meeting scheduled successfully",
+      meetingId: docRef.id,
+    });
   } catch (error) {
     console.error("scheduleMeeting error:", error);
     res.status(500).json({ error: "Failed to schedule meeting" });
   }
 };
-
 
 const addMeetingMinutes = async (req, res) => {
   try {
@@ -196,15 +200,17 @@ const addMeetingMinutes = async (req, res) => {
 
     if (!minutes || minutes.trim() === "") {
       return res.status(400).json({ error: "Meeting minutes are required" });
-    } 
+    }
     const meetingRef = db.collection("meetings").doc(meetingId);
     const meetingDoc = await meetingRef.get();
     if (!meetingDoc.exists) {
       return res.status(404).json({ error: "Meeting not found" });
     }
-    
-    if(meetingDoc.data().groupId !== groupId) {
-      return res.status(400).json({ error: "Meeting does not belong to the specified group" });
+
+    if (meetingDoc.data().groupId !== groupId) {
+      return res
+        .status(400)
+        .json({ error: "Meeting does not belong to the specified group" });
     }
 
     await meetingRef.update({
@@ -221,53 +227,55 @@ const addMeetingMinutes = async (req, res) => {
 
 const sendAnnouncement = async (req, res) => {
   try {
-      const { groupId } = req.params;
-      const { title, message} = req.body;
-      const adminId = req.user?.uid || "admin";
+    const { groupId } = req.params;
+    const { title, message } = req.body;
+    const adminId = req.user?.uid || "admin";
 
-      if (!title || !message) {
-          return res.status(400).json({ error: "Title and message are required" });
-      }
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
 
-      const groupRef = db.collection("groups").doc(groupId);
-      const groupDoc = await groupRef.get();
-      if (!groupDoc.exists) {
-          return res.status(404).json({ error: "Group not found" });
-      }
-      const announcement = {
-          groupId,
-          title,  
-          message,
-          createdBy: adminId,
-          createdAt: new Date(),
-          readBy: [],
-      };
+    const groupRef = db.collection("groups").doc(groupId);
+    const groupDoc = await groupRef.get();
+    if (!groupDoc.exists) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+    const announcement = {
+      groupId,
+      title,
+      message,
+      createdBy: adminId,
+      createdAt: new Date(),
+      readBy: [],
+    };
 
-      const docRef = await db.collection("announcements").add(announcement);
-      res.status(201).json({ message: "Announcement sent successfully", announcementId: docRef.id });
-
+    const docRef = await db.collection("announcements").add(announcement);
+    res.status(201).json({
+      message: "Announcement sent successfully",
+      announcementId: docRef.id,
+    });
   } catch (error) {
     console.error("sendAnnouncement error:", error);
     res.status(500).json({ error: "Failed to send announcement" });
   }
 };
 
-
 const getGroupAnnouncements = async (req, res) => {
   try {
     const { groupId } = req.params;
-    const{limit = 20, offset = 0} = req.query;
+    const { limit = 20, offset = 0 } = req.query;
 
-    const snapshot = await db.collection("announcements")
+    const snapshot = await db
+      .collection("announcements")
       .where("groupId", "==", groupId)
       .orderBy("createdAt", "desc")
       .limit(Number(limit))
       .get();
-    const announcements = snapshot.docs.map(doc => {
+    const announcements = snapshot.docs.map((doc) => {
       const data = doc.data();
       return {
         id: doc.id,
-        ...data
+        ...data,
       };
     });
     res.status(200).json(announcements);
@@ -284,5 +292,5 @@ module.exports = {
   scheduleMeeting,
   getGroupAnnouncements,
   sendAnnouncement,
-  addMeetingMinutes
+  addMeetingMinutes,
 };
