@@ -42,11 +42,14 @@ const UserDashboard = () => {
     setLoadingGroups(true);
     try {
       const groupsSnap = await getDocs(collection(db, 'groups'));
-      const groupsData = groupsSnap.docs.map(doc => ({
+      const allGroups = groupsSnap.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      setGroups(groupsData);
+      
+      // Filter to only show groups user is NOT a member of
+      const availableGroups = allGroups.filter(group => !userGroups.includes(group.id));
+      setGroups(availableGroups);
     } catch (err) {
       console.error('Failed to fetch groups:', err);
       setMessageMap({ error: { type: 'error', text: err.message } });

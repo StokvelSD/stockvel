@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 function CreateGroupForm() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [groupName, setGroupName] = useState("");
   const [description, setDescription] = useState("");
@@ -38,6 +40,7 @@ function CreateGroupForm() {
             meetingFrequency: frequency,
             duration,
             payoutOrder,
+            userId: user?.uid,
           }),
         },
       );

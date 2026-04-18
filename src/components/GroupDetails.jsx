@@ -1,23 +1,59 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { PaystackButton } from 'react-paystack';
+import { PaystackButton, usePaystackPayment } from 'react-paystack';
 
 function GroupDetails() {
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
+  const paymentTriggered = useRef(false);
+
+  // Paystack config
+  const paystackConfig = {
+    amount: (group?.contributionAmount || 0) * 100,
+    email: user?.email || "test@gmail.com",
+    reference: (new Date()).getTime().toString(),
+    publicKey: 'pk_test_321abd607bbc18daba90b70ebdd8cff5ea9b0cee',
+    currency: 'ZAR',
+    metadata: {
+      userId: user?.uid,
+      groupId: id,
+      groupName: group?.groupName || group?.name,
+      userName: user?.displayName || user?.email || "Member"
+    }
+  };
+
+  const initializePayment = usePaystackPayment(paystackConfig);
 
   useEffect(() => {
     fetchGroupDetails();
     fetchPaymentHistory();
-  }, [id]);
+  }, [id, user]);
+
+  // Auto-trigger payment if action=pay query param is present
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'pay' && !loading && group && !paymentTriggered.current) {
+      paymentTriggered.current = true;
+      initializePayment(
+        (reference) => {
+          alert("Payment successful! Waiting for the server to confirm your transaction.");
+          fetchPaymentHistory();
+        },
+        () => {
+          console.log('User closed the payment window');
+        }
+      );
+    }
+  }, [searchParams, loading, group, initializePayment]);
 
   const fetchGroupDetails = async () => {
     try {
@@ -58,20 +94,6 @@ function GroupDetails() {
       setPaymentHistory(paymentsData.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
     } catch (err) {
       console.error('Failed to fetch payment history:', err);
-    }
-  };
-
-  const paystackConfig = {
-    amount: (group?.contributionAmount || 0) * 100, 
-    email: user?.email || "test@gmail.com",
-    reference: (new Date()).getTime().toString(), 
-    publicKey: 'pk_test_321abd607bbc18daba90b70ebdd8cff5ea9b0cee', 
-    currency: 'ZAR', 
-    metadata: {
-      userId: user?.uid,
-      groupId: id,
-      groupName: group?.groupName || group?.name,
-      userName: user?.displayName || user?.email || "Member"
     }
   };
 

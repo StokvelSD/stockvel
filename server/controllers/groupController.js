@@ -10,6 +10,7 @@ const createGroup = async (req, res) => {
       meetingFrequency,
       duration,
       payoutOrder,
+      userId,
     } = req.body;
 
     if (!groupName || groupName.trim() === "") {
@@ -21,7 +22,8 @@ const createGroup = async (req, res) => {
         .json({ error: "Contribution amount must be greater than 0" });
     }
 
-    await db.collection("groups").add({
+    // Create the group with the creator as the first member
+    const groupData = {
       groupName: groupName.trim(),
       contributionAmount: Number(contributionAmount),
       description,
@@ -29,11 +31,31 @@ const createGroup = async (req, res) => {
       meetingFrequency,
       duration: Number(duration),
       payoutOrder,
-      members: [],
+      members: userId ? [userId] : [],
+      groupRoles: userId ? { [userId]: 'admin' } : {}, // Track roles per group
       createdAt: new Date(),
-    });
+    };
 
-    res.status(201).json({ message: "Group created successfully" });
+    const groupRef = await db.collection("groups").add(groupData);
+
+    // If userId is provided, also add the group to the user's groups array
+    if (userId) {
+      const userRef = db.collection("users").doc(userId);
+      const userDoc = await userRef.get();
+      
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        const userGroups = userData.groups || [];
+        
+        if (!userGroups.includes(groupRef.id)) {
+          await userRef.update({
+            groups: [...userGroups, groupRef.id]
+          });
+        }
+      }
+    }
+
+    res.status(201).json({ message: "Group created successfully", groupId: groupRef.id });
   } catch (error) {
     console.error("createGroup error:", error);
     res.status(500).json({ message: "Failed to create group" });

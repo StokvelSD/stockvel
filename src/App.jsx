@@ -70,6 +70,7 @@ function App() {
 
           <Route path="/contributions" element={<Dashboard />} />
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
+          <Route path="/configure-group/:groupId" element={<ConfigureGroupPage />} />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
 
