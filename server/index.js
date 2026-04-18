@@ -17,9 +17,10 @@ const corsOptions = {
 app.options("/{*path}", cors(corsOptions));
 
 app.use(cors(corsOptions));
+
+app.use("/api/webhook", webhookRoutes);
 app.use(express.json());
 app.use("/api/groups", groupRoutes);
-app.use("/api/webhook", webhookRoutes);
 
 const PORT = process.env.PORT || 5000;
 

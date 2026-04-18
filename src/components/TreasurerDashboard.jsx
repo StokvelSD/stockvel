@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../firebase/firebase'; 
-import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth'; 
+import { db } from '../firebase/firebase';
+import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
+import { useAuth } from '../contexts/AuthContext';
 import '../index.css';
 
 const isPaidOrCompleted = (status) => ['paid', 'completed', 'confirmed'].includes((status || '').toLowerCase());
@@ -13,49 +13,76 @@ const formatTimestamp = (ts) => {
 };
 
 export default function TreasurerDashboard() {
-  const [contributions, setContributions] = useState([]);
+  const { user } = useAuth();
+  const [tableData, setTableData] = useState([]);
+  const [groupId, setGroupId] = useState(null);
+  const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(true);
   const [showFinancePanel, setShowFinancePanel] = useState(false);
-  const currentGroupId = 'group_001';
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        try {
-          const snap = await getDocs(collection(db, 'contributions'));
-          setContributions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (e) { 
-          console.error(e); 
-        } finally { 
-          setLoading(false); 
-        }
-      } else {
-        setLoading(false); 
-      }
-    });
+    if (!user) return;
+    fetchDashboardData();
+  }, [user]);
 
-    return () => unsubscribe();
-  }, []);
-
-  const totalCollected = contributions
-    .filter(c => isPaidOrCompleted(c.status))
-    .reduce((s, c) => {
-      const cleanAmount = String(c.amount || '0').replace(/[^0-9.]/g, '');
-      return s + Number(cleanAmount);
-    }, 0);
-
-  const pendingCount   = contributions.filter(c => !isPaidOrCompleted(c.status)).length;
-  const nextRotation   = 'May 2025';
-
-  const handleConfirm = async (id) => {
+  const fetchDashboardData = async () => {
     try {
-      await updateDoc(doc(db, 'contributions', id), { status: 'paid', confirmedAt: serverTimestamp() });
-      const now = new Date();
-      setContributions(prev => prev.map(c => c.id === id ? { ...c, status: 'paid', confirmedAt: { toDate: () => now } } : c));
-    } catch (e) { console.error(e); alert('Failed to confirm payment.'); }
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const groupIds = userDoc.data()?.groups || [];
+      if (groupIds.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      const currentGroupId = groupIds[0];
+      setGroupId(currentGroupId);
+
+      const groupDoc = await getDoc(doc(db, 'groups', currentGroupId));
+      const groupData = groupDoc.data();
+      setGroupName(groupData?.groupName || groupData?.name || currentGroupId);
+
+      const memberIds = groupData?.members || [];
+
+      const memberDocs = await Promise.all(
+        memberIds.map(id => getDoc(doc(db, 'users', id)))
+      );
+      const members = memberDocs
+        .filter(d => d.exists())
+        .map(d => ({ id: d.id, ...d.data() }));
+
+      const paymentsSnap = await getDocs(
+        query(collection(db, 'payments'), where('groupId', '==', currentGroupId))
+      );
+      const payments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      const joined = members.map(member => {
+        const payment = payments.find(p => p.userId === member.id);
+        return {
+          ...member,
+          amount: payment?.amount || null,
+          status: payment?.status || 'unpaid',
+          confirmedAt: payment?.createdAt || null,
+        };
+      });
+
+      setTableData(joined);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleFinanceAction = (e) => { e.preventDefault(); setShowFinancePanel(false); };
+  const totalCollected = tableData
+    .filter(m => isPaidOrCompleted(m.status))
+    .reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
+
+  const pendingCount = tableData.filter(m => !isPaidOrCompleted(m.status)).length;
+
+  const handleFinanceAction = (e) => {
+    e.preventDefault();
+    setShowFinancePanel(false);
+  };
 
   if (loading) return (
     <div className="loading-screen">
@@ -64,11 +91,20 @@ export default function TreasurerDashboard() {
     </div>
   );
 
+  if (!groupId) return (
+    <div className="treasurer-page">
+      <div className="dashboard-header">
+        <h2>Treasurer Dashboard</h2>
+        <p>You are not assigned to any group yet.</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="treasurer-page">
       <div className="dashboard-header">
         <h2>Treasurer Dashboard</h2>
-        <p>Audit-ready contribution tracking for {currentGroupId}.</p>
+        <p>Managing: <strong>{groupName}</strong></p>
       </div>
 
       <div className="stats-grid">
@@ -78,18 +114,18 @@ export default function TreasurerDashboard() {
           <div className="stat-sub">confirmed payments</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Total Records</div>
-          <div className="stat-value">{contributions.length}</div>
-          <div className="stat-sub">all members</div>
+          <div className="stat-label">Total Members</div>
+          <div className="stat-value">{tableData.length}</div>
+          <div className="stat-sub">in this group</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Pending</div>
           <div className="stat-value" style={{ color: '#d97706' }}>{pendingCount}</div>
-          <div className="stat-sub">awaiting confirmation</div>
+          <div className="stat-sub">awaiting payment</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Next Payout</div>
-          <div className="stat-value" style={{ fontSize: '1.3rem' }}>{nextRotation}</div>
+          <div className="stat-value" style={{ fontSize: '1.3rem' }}>May 2026</div>
           <div className="stat-sub">rotation date</div>
         </div>
       </div>
@@ -130,47 +166,33 @@ export default function TreasurerDashboard() {
       )}
 
       <div className="dashboard-card">
-        <h3>All Member Contributions</h3>
+        <h3>All Group Members</h3>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Member</th>
-                <th>Amount</th>
-                <th>Due Date</th>
-                <th>Confirmed</th>
-                <th>Method</th>
+                <th>Email</th>
+                <th>Amount Paid</th>
+                <th>Payment Date</th>
                 <th>Status</th>
-                <th>Action</th>
               </tr>
             </thead>
             <tbody>
-              {contributions.map(c => {
-                const paid = isPaidOrCompleted(c.status);
-                const confTime = formatTimestamp(c.confirmedAt);
-                
-                const safeDate = formatTimestamp(c.date) || c.date; 
-                
-                const displayAmount = String(c.amount || '0').replace(/[^0-9.]/g, ''); 
+              {tableData.map(member => {
+                const paid = isPaidOrCompleted(member.status);
+                const confTime = formatTimestamp(member.confirmedAt);
 
                 return (
-                  <tr key={c.id}>
-                    <td><strong>{c.member || c.userId || 'Unknown'}</strong></td>
-                    <td>R {displayAmount}</td>
-                    <td style={{ color: '#64748b' }}>{typeof safeDate === 'string' ? safeDate : '—'}</td>
+                  <tr key={member.id}>
+                    <td><strong>{member.name || member.email || 'Unknown'}</strong></td>
+                    <td style={{ color: '#64748b' }}>{member.email || '—'}</td>
+                    <td>{member.amount ? `R ${member.amount}` : '—'}</td>
                     <td style={{ fontSize: '0.8rem', color: '#64748b' }}>{confTime || '—'}</td>
-                    <td style={{ color: '#64748b' }}>{c.paymentMethod || '—'}</td>
                     <td>
                       <span className={`badge ${paid ? 'badge-success' : 'badge-warning'}`}>
-                        {(c.status || 'pending').toUpperCase()}
+                        {member.status.toUpperCase()}
                       </span>
-                    </td>
-                    <td>
-                      {!paid && (
-                        <button className="btn-primary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.8rem' }} onClick={() => handleConfirm(c.id)}>
-                          Confirm
-                        </button>
-                      )}
                     </td>
                   </tr>
                 );
