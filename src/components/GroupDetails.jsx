@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
-import { doc, getDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { PaystackButton } from 'react-paystack';
 
 function GroupDetails() {
   const { id } = useParams();
@@ -11,10 +12,6 @@ function GroupDetails() {
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentHistory, setPaymentHistory] = useState([]);
 
   useEffect(() => {
@@ -29,7 +26,6 @@ function GroupDetails() {
         const groupData = { id: groupDoc.id, ...groupDoc.data() };
         setGroup(groupData);
         
-        // Fetch member details
         const memberIds = groupData.members || [];
         const membersData = [];
         for (const memberId of memberIds) {
@@ -65,42 +61,34 @@ function GroupDetails() {
     }
   };
 
-  const handleMakePayment = async (e) => {
-    e.preventDefault();
-    if (!paymentAmount || paymentAmount <= 0) {
-      alert('Please enter a valid amount');
-      return;
+  const paystackConfig = {
+    amount: (group?.contributionAmount || 0) * 100, 
+    email: user?.email || "test@gmail.com",
+    reference: (new Date()).getTime().toString(), 
+    publicKey: 'pk_test_321abd607bbc18daba90b70ebdd8cff5ea9b0cee', 
+    currency: 'ZAR', 
+    metadata: {
+      userId: user?.uid,
+      groupId: id,
+      groupName: group?.groupName || group?.name,
+      userName: user?.displayName || user?.email || "Member"
     }
+  };
 
-    setProcessingPayment(true);
-    try {
-      const paymentData = {
-        groupId: id,
-        groupName: group.groupName || group.name,
-        userId: user.uid,
-        userName: user.displayName || user.email,
-        amount: Number(paymentAmount),
-        method: paymentMethod,
-        status: 'pending',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      await addDoc(collection(db, 'payments'), paymentData);
-      
-      alert(`Payment of R${paymentAmount} submitted successfully! It will be confirmed by the treasurer.`);
-      
-      setPaymentAmount('');
-      setPaymentMethod('cash');
-      setShowPaymentModal(false);
-      await fetchPaymentHistory();
-      
-    } catch (err) {
-      console.error('Failed to process payment:', err);
-      alert('Failed to process payment. Please try again.');
-    } finally {
-      setProcessingPayment(false);
-    }
+  const handlePaystackSuccessAction = (reference) => {
+    alert("Payment successful! Waiting for the server to confirm your transaction.");
+    fetchPaymentHistory(); 
+  };
+
+  const handlePaystackCloseAction = () => {
+    console.log('User closed the payment window');
+  };
+
+  const componentProps = {
+    ...paystackConfig,
+    text: `Pay R${group?.contributionAmount || 0} Now`,
+    onSuccess: (reference) => handlePaystackSuccessAction(reference),
+    onClose: handlePaystackCloseAction,
   };
 
   if (loading) {
@@ -135,24 +123,18 @@ function GroupDetails() {
           </button>
         </div>
 
-        {/* Group Information */}
         <div className="section-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h2>{group.groupName || group.name}</h2>
               {group.description && <p>{group.description}</p>}
             </div>
-            <button 
-              className="btn btn-primary"
-              onClick={() => setShowPaymentModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <rect x="2" y="5" width="20" height="14" rx="2"/>
-                <line x1="2" y1="10" x2="22" y2="10"/>
-              </svg>
-              Make Payment
-            </button>
+            
+            <PaystackButton 
+              {...componentProps} 
+              className="btn btn-primary" 
+              style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }} 
+            />
           </div>
           
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
@@ -179,7 +161,6 @@ function GroupDetails() {
           </div>
         </div>
 
-        {/* Members List */}
         <div className="section-card">
           <h3>👥 Group Members ({members.length})</h3>
           
@@ -189,7 +170,7 @@ function GroupDetails() {
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {members.map((member, index) => (
+              {members.map((member) => (
                 <div 
                   key={member.id} 
                   style={{
@@ -200,7 +181,6 @@ function GroupDetails() {
                     backgroundColor: member.id === user?.uid ? '#f0f9ff' : 'white',
                     border: '1px solid var(--border)',
                     borderRadius: '8px',
-                    transition: 'all 0.2s ease'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -253,7 +233,6 @@ function GroupDetails() {
           )}
         </div>
 
-        {/* Payment History */}
         {paymentHistory.length > 0 && (
           <div className="section-card">
             <h3>💰 My Payment History</h3>
@@ -274,7 +253,7 @@ function GroupDetails() {
                     </div>
                   </div>
                   <div>
-                    <span className={`badge ${payment.status === 'confirmed' ? 'badge-success' : 'badge-warning'}`}>
+                    <span className={`badge ${payment.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
                       {payment.status || 'pending'}
                     </span>
                   </div>
@@ -283,109 +262,7 @@ function GroupDetails() {
             </div>
           </div>
         )}
-
-        {/* Payment Modal */}
-        {showPaymentModal && (
-          <div className="modal-overlay" style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000
-          }} onClick={() => setShowPaymentModal(false)}>
-            <div className="modal-content" style={{
-              background: 'white',
-              borderRadius: '12px',
-              padding: '1.5rem',
-              maxWidth: '500px',
-              width: '90%',
-              maxHeight: '80vh',
-              overflow: 'auto'
-            }} onClick={(e) => e.stopPropagation()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ margin: 0 }}>Make Payment</h3>
-                <button 
-                  onClick={() => setShowPaymentModal(false)}
-                  style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-                >
-                  ×
-                </button>
-              </div>
-              
-              <form onSubmit={handleMakePayment}>
-                <div className="form-group">
-                  <label>Group</label>
-                  <input 
-                    type="text" 
-                    value={group.groupName || group.name} 
-                    disabled 
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: '#f5f5f5' }}
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label>Amount (R)</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    placeholder={`Enter amount (min: R${group.contributionAmount})`}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    min={group.contributionAmount || 0}
-                    required
-                    autoFocus
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}
-                  />
-                  {group.contributionAmount && (
-                    <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>
-                      Minimum contribution: R{group.contributionAmount}
-                    </small>
-                  )}
-                </div>
-                
-                <div className="form-group">
-                  <label>Payment Method</label>
-                  <select
-                    className="form-control"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    required
-                    style={{ width: '100%', padding: '0.5rem', borderRadius: '6px', border: '1px solid var(--border)' }}
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="card">Card</option>
-                    <option value="mobile_money">Mobile Money</option>
-                  </select>
-                </div>
-                
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => setShowPaymentModal(false)}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={processingPayment}
-                    style={{ flex: 1, padding: '0.5rem', borderRadius: '6px', cursor: 'pointer' }}
-                  >
-                    {processingPayment ? 'Processing...' : 'Submit Payment'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        
       </div>
     </div>
   );
