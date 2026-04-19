@@ -50,6 +50,18 @@ function Notifications() {
         } catch (err) {
           console.error(`Announcement fetch error:`, err);
         }
+
+        try {
+          const meetingRes = await fetch(
+            `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/meetings`,
+          );
+          if (meetingRes.ok) {
+            const data = await meetingRes.json();
+            allMeetings.push(...data);
+          }
+        } catch (err) {
+          console.error(`Meeting fetch error:`, err);
+        }
       }
       setAnnouncements(allAnnouncements);
       setMeetings(allMeetings);
@@ -106,6 +118,7 @@ function Notifications() {
       </div>
 
       {/* Meetings */}
+
       <div className="section-card">
         <h3>Scheduled Meetings</h3>
         {loadingFeed ? (
@@ -116,6 +129,7 @@ function Notifications() {
           <div className="feed-list">
             {meetings.map((m) => (
               <div key={m.id} className="feed-item meeting">
+                <div className="feed-item-group">{m.groupName}</div>
                 <div className="feed-item-title">{m.title}</div>
                 <div className="feed-item-meta">
                   <span className="feed-item-tag">
@@ -127,16 +141,13 @@ function Notifications() {
                 </div>
                 <div className="feed-item-date">
                   {m.date
-                    ? new Date(m.date._seconds * 1000).toLocaleDateString(
-                        "en-ZA",
-                        {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        },
-                      )
+                    ? new Date(m.date).toLocaleDateString("en-ZA", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
                     : ""}
                 </div>
               </div>
