@@ -317,12 +317,92 @@ const getGroupAnnouncements = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch announcements" });
   }
 };
+
+const getGroupMeetings = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const{status} = req.query;
+
+    if(!groupId){
+      return res.status(400).json({error:"Group ID is required"});
+    }
+
+    const groupRef = db.collection("groups").doc(groupId);
+    const groupDoc = await groupRef.get();
+    if(!groupDoc.exists){
+      return res.status(404).json({error:"Group not found"});
+    }
+
+    let meetingsQuery = db.collection("meetings").where("groupId", "==", groupId);
+
+    if(status){
+      meetingsQuery = meetingsQuery.where("status", "==", status);
+    }
+
+    const snapshot = await meetingsQuery.get();
+
+    const meetings = snapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date?.toDate?.() ?? new Date(),
+        createdAt: data.createdAt?.toDate?.() ?? new Date(),
+        completedAt: data.completedAt?.toDate?.() ?? null,
+      };
+    });
+    meetings.sort((a, b) => new Date(a.date) - new Date(b.date));
+    res.status(200).json(meetings);
+  }catch (error) {
+    console.error("getGroupMeetings error:", error);
+    res.status(500).json({error:"Failed to fetch meetings"});
+  }
+};
+
+const getMeetingById = async (req, res) => {
+  try {
+    const { groupId, meetingId } = req.params;
+    if (!groupId || !meetingId) {
+      return res.status(400).json({ error: "Group ID and Meeting ID are required" });
+    }
+
+    const meetingRef = db.collection("meetings").doc(meetingId);
+    const meetingDoc = await meetingRef.get();
+
+    if (!meetingDoc.exists) {
+      return res.status(404).json({ error: "Meeting not found" });
+    }
+
+    const meetingData = meetingDoc.data();
+
+    if (meetingData.groupId !== groupId) {
+      return res.status(400).json({ error: "Meeting does not belong to the specified group" });
+    }
+
+    const meeting = {
+      id: meetingDoc.id,
+      ...meetingData,
+      date: meetingData.date?.toDate?.() ?? new Date(),
+      createdAt: meetingData.createdAt?.toDate?.() ?? new Date(),
+      completedAt: meetingData.completedAt?.toDate?.() ?? null,
+    };
+
+    res.status(200).json(meeting);
+  } catch (error) {
+    console.error("getMeetingById error:", error);
+    res.status(500).json({ error: "Failed to fetch meeting" });
+  }
+};
+
+    
 module.exports = {
   createGroup,
   getGroups,
   getGroupById,
   joinGroup,
   scheduleMeeting,
+  getGroupMeetings,
+  getMeetingById,
   getGroupAnnouncements,
   sendAnnouncement,
   addMeetingMinutes,
