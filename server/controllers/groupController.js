@@ -32,7 +32,7 @@ const createGroup = async (req, res) => {
       duration: Number(duration),
       payoutOrder,
       members: userId ? [userId] : [],
-      groupRoles: userId ? { [userId]: 'admin' } : {}, // Track roles per group
+      groupRoles: userId ? { [userId]: "admin" } : {}, // Track roles per group
       createdAt: new Date(),
     };
 
@@ -42,20 +42,22 @@ const createGroup = async (req, res) => {
     if (userId) {
       const userRef = db.collection("users").doc(userId);
       const userDoc = await userRef.get();
-      
+
       if (userDoc.exists) {
         const userData = userDoc.data();
         const userGroups = userData.groups || [];
-        
+
         if (!userGroups.includes(groupRef.id)) {
           await userRef.update({
-            groups: [...userGroups, groupRef.id]
+            groups: [...userGroups, groupRef.id],
           });
         }
       }
     }
 
-    res.status(201).json({ message: "Group created successfully", groupId: groupRef.id });
+    res
+      .status(201)
+      .json({ message: "Group created successfully", groupId: groupRef.id });
   } catch (error) {
     console.error("createGroup error:", error);
     res.status(500).json({ message: "Failed to create group" });
@@ -287,6 +289,14 @@ const getGroupAnnouncements = async (req, res) => {
     const { groupId } = req.params;
     const { limit = 20, offset = 0 } = req.query;
 
+    // Get group name once
+    const groupDoc = await db.collection("groups").doc(groupId).get();
+    if (!groupDoc.exists) {
+      return res.status(404).json({ error: "Group not found" });
+    }
+
+    const groupName = groupDoc.data().groupName;
+
     const snapshot = await db
       .collection("announcements")
       .where("groupId", "==", groupId)
@@ -298,6 +308,7 @@ const getGroupAnnouncements = async (req, res) => {
       return {
         id: doc.id,
         ...data,
+        groupName,
       };
     });
     res.status(200).json(announcements);

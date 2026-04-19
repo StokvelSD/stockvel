@@ -1,0 +1,167 @@
+/* ===== NOTIFICATIONS PAGE ===== */
+
+/* ── Page wrapper ── */
+.notifications-page {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2.5rem 2rem;
+}
+
+/* ── Page header ── */
+.notifications-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.notifications-header h2 {
+  font-size: 1.5rem;
+  color: var(--text);
+  margin: 0;
+}
+
+/* ===== SECTION CARD ===== */
+.section-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+
+.section-card h3 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ===== FEED LIST ===== */
+.feed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ===== FEED ITEM BASE ===== */
+.feed-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.feed-item:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* ===== ANNOUNCEMENT ITEM ===== */
+.feed-item.announcement {
+  background: rgba(255, 255, 255, 0.477);
+  border-left: 4px solid #f59e0b;
+}
+
+.feed-item.announcement .feed-item-title {
+  color: #92400e;
+}
+
+/* ===== MEETING ITEM ===== */
+.feed-item.meeting {
+  background: var(--blue-pale);
+  border-left: 4px solid var(--blue);
+}
+
+.feed-item.meeting .feed-item-title {
+  color: var(--blue-dark);
+}
+
+/* ===== FEED ITEM CONTENT ===== */
+.feed-item-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+
+.feed-item-message {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ===== META ROW ===== */
+.feed-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.feed-item-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ===== DATE STAMP ===== */
+.feed-item-date {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.25rem;
+}
+
+/* ===== EMPTY & LOADING STATES ===== */
+.feed-empty {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.feed-loading {
+  padding: 1rem 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .notifications-page {
+    padding: 1.5rem 1rem;
+  }
+  .section-card {
+    padding: 1.1rem;
+  }
+  .feed-item {
+    padding: 0.85rem 1rem;
+  }
+}
+.feed-item-group {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 4px;
+}
