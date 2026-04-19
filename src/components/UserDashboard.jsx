@@ -25,6 +25,7 @@ const UserDashboard = () => {
   const [showBrowseGroups, setShowBrowseGroups] = useState(false);
   const [userGroups, setUserGroups] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   // Demo data for dashboard
   const [paymentHistory, setPaymentHistory] = useState([
@@ -47,6 +48,31 @@ const UserDashboard = () => {
       fetchPendingRequests();
     }
   }, [showBrowseGroups, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchCount = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (!userDoc.exists()) return;
+        const groupIds = userDoc.data().groups || [];
+        let count = 0;
+        for (const groupId of groupIds) {
+          const res = await fetch(
+            `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/announcements`,
+          );
+          if (res.ok) {
+            const data = await res.json();
+            count += data.length;
+          }
+        }
+        setNotificationCount(count);
+      } catch (err) {
+        console.error("Failed to fetch notification count:", err);
+      }
+    };
+    fetchCount();
+  }, [user]);
 
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
@@ -547,7 +573,29 @@ const UserDashboard = () => {
                 padding: "0 3px",
               }}
             >
-              ?
+              {notificationCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: "-6px",
+                    right: "-6px",
+                    background: "#dc2626",
+                    color: "#fff",
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    minWidth: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "2px solid var(--bg)",
+                    padding: "0 3px",
+                  }}
+                >
+                  {notificationCount}
+                </span>
+              )}
             </span>
           </div>
         </div>
