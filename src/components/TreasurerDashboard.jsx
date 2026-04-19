@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, act } from 'react';
 import { db, auth } from '../firebase/firebase'; 
 import { collection, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth'; 
 import '../index.css';
-
+import { initiatePayout } from "./initiatePayout";
 const isPaidOrCompleted = (status) => ['paid', 'completed', 'confirmed'].includes((status || '').toLowerCase());
 
 const formatTimestamp = (ts) => {
@@ -17,7 +17,29 @@ export default function TreasurerDashboard() {
   const [loading, setLoading] = useState(true);
   const [showFinancePanel, setShowFinancePanel] = useState(false);
   const currentGroupId = 'group_001';
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
+const handleInitiatePayout = async () => {
+  setError("");
+  setSuccess("");
+  setLoading(true);
+
+  try {
+    await initiatePayout({
+      amount: Number(payoutAmount),
+      currentCycleId: 1, // must already exist in this file
+    });
+
+    setSuccess("Payout initiated successfully");
+    setPayoutAmount("");
+  } catch (err) {
+    setError(err.message || "Failed to initiate payout");
+  } finally {
+    setLoading(false);
+  }
+};
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -99,6 +121,22 @@ export default function TreasurerDashboard() {
           Manage Finances
         </button>
         <button className="btn-secondary">Record Payout</button>
+         <input
+    type="number"
+    placeholder="Payout amount"
+    value={payoutAmount}
+    onChange={(e) => setPayoutAmount(e.target.value)}
+  />
+
+  <button className="btn-primary"
+    onClick={handleInitiatePayout}
+    disabled={loading}
+  >
+    {loading ? "Processing..." : "Initiate Payout"}
+  </button>
+
+  {error && <p style={{ color: "red" }}>{error}</p>}
+  {success && <p style={{ color: "green" }}>{success}</p>}
       </div>
 
       {showFinancePanel && (
