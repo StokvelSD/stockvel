@@ -24,6 +24,23 @@ function CreateGroupForm() {
     setLoading(true);
     setError("");
 
+    // Add this before the fetch call:
+    if (Number(maxMembers) < 1) {
+      setError("Max members must be at least 1");
+      setLoading(false);
+      return;
+    }
+    if (Number(contribution) < 1) {
+      setError("Contribution amount must be at least R1");
+      setLoading(false);
+      return;
+    }
+    if (Number(duration) < 1) {
+      setError("Duration must be at least 1 month");
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(
         "https://stockvel-2kvp.onrender.com/api/groups",
@@ -66,7 +83,7 @@ function CreateGroupForm() {
   return (
     <main>
       <section>
-        <button className="back-btn" onClick={() => navigate("/")}>
+        <button className="back-btn" onClick={() => navigate("/admin")}>
           ←
         </button>
       </section>
@@ -103,6 +120,7 @@ function CreateGroupForm() {
               onChange={(e) => setMaxMembers(e.target.value)}
               placeholder="e.g. 12"
               required
+              min="1"
             />
 
             <label htmlFor="contribution">Contribution Amount (R)</label>
@@ -113,6 +131,7 @@ function CreateGroupForm() {
               onChange={(e) => setContribution(e.target.value)}
               placeholder="e.g. 500"
               required
+              min="1"
             />
 
             <label htmlFor="frequency">Contribution Frequency</label>
@@ -136,6 +155,7 @@ function CreateGroupForm() {
               onChange={(e) => setDuration(e.target.value)}
               placeholder="e.g. 12"
               required
+              min="1"
             />
 
             {/*  FIXED DROPDOWN */}
