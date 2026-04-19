@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { auth } from '../firebase/firebase';
+import { auth  } from '../firebase/firebase';
 import '../index.css';
 
 const Navbar = () => {
@@ -9,6 +9,7 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const currentUser = useAuth()
 
   // Auto redirect to home if trying to access protected routes without login
   useEffect(() => {
@@ -20,6 +21,8 @@ const Navbar = () => {
       navigate('/');
     }
   }, [user, loading, location, navigate]);
+
+  
 
   const handleLogout = async () => { 
     await logout(); 
@@ -52,8 +55,12 @@ const Navbar = () => {
         <span className="bar"/><span className="bar"/><span className="bar"/>
       </button>
 
+      
       <div className={`nav-links${isOpen ? ' active' : ''}`}>
-        <Link to="/" className="nav-link" onClick={() => setIsOpen(false)}>Home</Link>
+
+        {!user && (
+          <Link to="/" className="nav-link" onClick={() => setIsOpen(false)}>Home</Link>
+        )}
 
         {user ? (
           <>
