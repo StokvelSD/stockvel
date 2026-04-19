@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 // ── Reusable Field wrapper
 
@@ -376,18 +377,31 @@ function ConfigureForm({ group, onBack }) {
 // ── VIEW 1 — List of all active groups ───
 
 function GroupList({ onSelect }) {
+  const { user } = useAuth();
   const [groups, setGroups] = useState([]);
+  const [userGroupIds, setUserGroupIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const fetchGroups = async () => {
+    const fetchData = async () => {
       try {
+        // Fetch all groups
         const res = await fetch(
           "https://stockvel-2kvp.onrender.com/api/groups",
         );
         if (!res.ok) throw new Error("Failed to fetch groups");
         const data = await res.json();
+        
+        // Fetch user's groups from their document
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserGroupIds(userData.groups || []);
+          }
+        }
+        
         setGroups(data);
       } catch (err) {
         setError(err.message);
@@ -395,8 +409,15 @@ function GroupList({ onSelect }) {
         setLoading(false);
       }
     };
-    fetchGroups();
-  }, []);
+    fetchData();
+  }, [user]);
+
+  // Filter groups to only show groups the user is a member of
+  const userGroups = groups.filter(g => {
+    if (userGroupIds.includes(g.id)) return true;
+    if (g.members && g.members.includes(user?.uid)) return true;
+    return false;
+  });
 
   if (loading) {
     return (
@@ -429,7 +450,7 @@ function GroupList({ onSelect }) {
     );
   }
 
-  if (groups.length === 0) {
+  if (userGroups.length === 0) {
     return (
       <div
         style={{
@@ -438,14 +459,14 @@ function GroupList({ onSelect }) {
           color: "var(--text-muted)",
         }}
       >
-        No active groups found.
+        You are not a member of any groups yet.
       </div>
     );
   }
 
   return (
     <section className="active-groups-container">
-      {groups.map((group) => (
+      {userGroups.map((group) => (
         <section
           key={group.id}
           className="active-Member"
@@ -526,15 +547,54 @@ function GroupList({ onSelect }) {
 
 // ── ROOT EXPORT ──────────────
 
-export default function ConfigureGroupPage({ onBack }) {
+export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
+  const [loadingPreselected, setLoadingPreselected] = useState(!!preselectedGroupId);
   const navigate = useNavigate();
+
+  // If preselectedGroupId is provided, fetch and select that group directly
+  useEffect(() => {
+    if (preselectedGroupId) {
+      const fetchGroup = async () => {
+        try {
+          const res = await fetch(
+            `https://stockvel-2kvp.onrender.com/api/groups/${preselectedGroupId}`,
+          );
+          if (res.ok) {
+            const groupData = await res.json();
+            setSelectedGroup(groupData);
+          }
+        } catch (err) {
+          console.error('Failed to fetch preselected group:', err);
+        } finally {
+          setLoadingPreselected(false);
+        }
+      };
+      fetchGroup();
+    }
+  }, [preselectedGroupId]);
+
+  if (loadingPreselected) {
+    return (
+      <div className="dashboard-page">
+        <div className="dashboard-inner">
+          <p>Loading group...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (selectedGroup) {
     return (
       <ConfigureForm
         group={selectedGroup}
-        onBack={() => setSelectedGroup(null)}
+        onBack={() => {
+          if (preselectedGroupId) {
+            navigate('/browse-groups');
+          } else {
+            setSelectedGroup(null);
+          }
+        }}
       />
     );
   }

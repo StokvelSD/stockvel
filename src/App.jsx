@@ -7,7 +7,7 @@ import {
 import NavBar from "./components/NavBar.jsx";
 import LandingPage from "./components/LandingPage";
 import Login from "./components/Login";
-import GroupDetails from './components/GroupDetails';
+import GroupDetails from "./components/GroupDetails";
 
 import Register from "./components/Register";
 import AdminDashboard from "./components/AdminDashboard";
@@ -15,6 +15,7 @@ import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
 import UserDashboard from "./components/UserDashboard";
 import Dashboard from "./pages/Dashboard.jsx";
 import AdminPage from "./pages/AdminPage";
+import Notifications from "./components/Notifications.jsx";
 
 import CreateGroupPage from "./pages/CreateGroupPage";
 import BrowseGroupsPage from "./pages/BrowseGroupsPage";
@@ -25,6 +26,7 @@ import "./AdminMain.css";
 import "./CreateGroup.css";
 import "./Configure.css";
 import "./ShowActiveGroup.css";
+import "./Notifications.css";
 
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 
@@ -49,7 +51,7 @@ function App() {
           <Route path="/register" element={<Register />} />
 
           <Route path="/admin" element={<AdminPage />} />
-
+          <Route path="/notifications" element={<Notifications />} />
           <Route
             path="/treasurer"
             element={
@@ -70,9 +72,12 @@ function App() {
 
           <Route path="/contributions" element={<Dashboard />} />
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
+          <Route
+            path="/configure-group/:groupId"
+            element={<ConfigureGroupPage />}
+          />
           <Route path="/create-group" element={<CreateGroupPage />} />
           <Route path="/browse-groups" element={<BrowseGroupsPage />} />
-
 
           <Route path="/group/:id" element={<GroupDetails />} />
 
