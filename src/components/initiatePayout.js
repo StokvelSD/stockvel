@@ -9,6 +9,8 @@ import {
   where,
   orderBy,
   serverTimestamp,
+  setDoc,
+  increment,
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
@@ -211,13 +213,11 @@ export const initiatePayout = async ({ amount, currentCycleId }) => {
 
   // 9️⃣ Update treasury balance
   //await updateDoc(doc(db, "treasury", "main"), { balance: newBalance });
-
-  // 🔟 Advance cycle if all members have now been paid
-  // if (payoutsSnap.size + 1 === members.length) {
-  //   await updateDoc(doc(db, "meta", "cycle"), {
-  //     currentCycleId: currentCycleId + 1,
-  //   });
-  // }
+ await setDoc(
+  doc(db, "total collected", "YOUR_DOCUMENT_ID"),
+  { amount: increment(-amount) },
+  { merge: true }
+);
 
   return true;
 };
