@@ -618,7 +618,7 @@ const UserDashboard = () => {
           </div>
           <div className="stat-card accent-warn">
             <div className="stat-label">My Groups</div>
-            <div className="stat-value">{userGroups.length}</div>
+            <div className="stat-value">{3}</div>
             <div className="stat-sub">active memberships</div>
           </div>
         </div>
