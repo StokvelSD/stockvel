@@ -29,9 +29,10 @@ const handleInitiatePayout = async () => {
   try {
     await initiatePayout({
       amount: Number(payoutAmount),
-      currentCycleId: 1, // must already exist in this file
+      currentCycleId: 1,
     });
 
+    setTotalPaidOut(prev => prev + Number(payoutAmount)); // ← add this
     setSuccess("Payout initiated successfully");
     setPayoutAmount("");
   } catch (err) {
@@ -59,13 +60,14 @@ const handleInitiatePayout = async () => {
     return () => unsubscribe();
   }, []);
 
-  const totalCollected = contributions
-    .filter(c => isPaidOrCompleted(c.status))
-    .reduce((s, c) => {
-      const cleanAmount = String(c.amount || '0').replace(/[^0-9.]/g, '');
-      return s + Number(cleanAmount);
-    }, 0);
+const [totalPaidOut, setTotalPaidOut] = useState(0);
 
+const totalCollected = contributions
+  .filter(c => isPaidOrCompleted(c.status))
+  .reduce((s, c) => {
+    const cleanAmount = String(c.amount || '0').replace(/[^0-9.]/g, '');
+    return s + Number(cleanAmount);
+  }, 0) - totalPaidOut;
   const pendingCount   = contributions.filter(c => !isPaidOrCompleted(c.status)).length;
   const nextRotation   = 'May 2025';
 
