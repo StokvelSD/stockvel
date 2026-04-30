@@ -1,4 +1,3 @@
-// src/initiatePayout.js
 import {
   collection,
   getDocs,
@@ -7,27 +6,16 @@ import {
   doc,
   query,
   where,
-  orderBy,
   serverTimestamp,
-  setDoc,
-  increment,
+  getDoc,
 } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { db } from "../firebase/firebase"; 
 
-// ⚠️  Keep this in an .env file: VITE_PAYSTACK_SECRET_KEY=sk_live_...
-// Only acceptable for internal/admin tools — never ship this in a public app.
 const PAYSTACK_SECRET = "sk_test_adc15a664a72600a8e6f56b95cc04f43368d7c72";
 const PAYSTACK_BASE   = "https://api.paystack.co";
 
-// ---------------------------------------------------------------------------
-// Thin Paystack client (no SDK needed)
-// ---------------------------------------------------------------------------
-
-
 async function resolveAccount(accountNumber, bankCode) {
   if (PAYSTACK_SECRET.startsWith("sk_test_")) {
-    // Paystack test mode doesn't support account resolution
-    // Return a mock resolved account
     return {
       account_number: accountNumber,
       account_name: "Test Account",
@@ -43,22 +31,9 @@ async function resolveAccount(accountNumber, bankCode) {
   if (!data.status) throw new Error(`Account resolution failed: ${data.message}`);
   return data.data;
 }
-/**
- * Resolve a bank account to a Paystack transfer recipient code.
- * We create a new recipient each time; in production you'd cache this.
- */
-// 2. Create recipient (calls resolveAccount first)
-
-const res = await fetch("https://api.paystack.co/bank?currency=NGN&type=nuban", {
-  headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` }
-});
-const { data } = await res.json();
-console.log(JSON.stringify(data.map(b => ({ name: b.name, code: b.code }))));
-
 
 async function createTransferRecipient(bankDetails) {
   if (PAYSTACK_SECRET.startsWith("sk_test_")) {
-    console.log("Test mode: skipping recipient creation, using mock recipient code");
     return "RCP_test_mock";
   }
 
@@ -75,30 +50,23 @@ async function createTransferRecipient(bankDetails) {
       name: resolved.account_name,
       account_number: resolved.account_number,
       bank_code: bankDetails.bankCode,
-      currency: "NGN",
+      currency: "ZAR", 
     }),
   });
 
   const data = await res.json();
-  console.log("createTransferRecipient response:", JSON.stringify(data));
   if (!data.status) throw new Error(data.message || "Failed to create transfer recipient");
   return data.data.recipient_code;
 }
 
-/**
- * Initiate a Paystack transfer and return { reference, newBalance }.
- * Amount must be in kobo (multiply naira × 100).
- */
-async function paystackTransfer({ recipientCode, amountNaira, payoutId }) {
+async function paystackTransfer({ recipientCode, amountZAR, payoutId }) {
   if (PAYSTACK_SECRET.startsWith("sk_test_")) {
-    console.log("Test mode: skipping real transfer");
     return {
       reference: `TEST_REF_${Date.now()}`,
       newBalance: 0,
     };
   }
 
-  // real transfer code below...
   const res = await fetch(`${PAYSTACK_BASE}/transfer`, {
     method: "POST",
     headers: {
@@ -107,67 +75,60 @@ async function paystackTransfer({ recipientCode, amountNaira, payoutId }) {
     },
     body: JSON.stringify({
       source: "balance",
-      amount: amountNaira * 100,
+      amount: amountZAR * 100, 
       recipient: recipientCode,
-      reason: `Stokvel payout – ${payoutId}`,
+      reason: `Stokvel payout - ${payoutId}`,
     }),
   });
 
   const data = await res.json();
   if (!data.status) throw new Error(data.message || "Paystack transfer failed");
 
-  const balRes = await fetch(`${PAYSTACK_BASE}/balance`, {
-    headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` },
-  });
-  const balData = await balRes.json();
-  const newBalanceNaira = balData.data[0].balance / 100;
-
-  return { reference: data.data.reference, newBalance: newBalanceNaira };
+  return { reference: data.data.reference, newBalance: 0 };
 }
 
-// ---------------------------------------------------------------------------
-// Main export
-// ---------------------------------------------------------------------------
-
-export const initiatePayout = async ({ amount, currentCycleId }) => {
+export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) => {
   if (!amount || amount <= 0) {
     throw new Error("Invalid payout amount");
   }
 
-  // 1️⃣ Fetch members alphabetically
-  const membersSnap = await getDocs(
-    query(collection(db, "contributions"), orderBy("member", "asc"))
-  );
+  const groupDoc = await getDoc(doc(db, "groups", groupId));
+  if (!groupDoc.exists()) throw new Error("Group not found");
+  
+  const groupData = groupDoc.data();
+  const memberIds = groupData.members || [];
+  if (memberIds.length === 0) throw new Error("No members in this group");
 
-  const members = membersSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-  if (!members.length) throw new Error("No members found");
+  const userDocs = await Promise.all(memberIds.map(id => getDoc(doc(db, "users", id))));
+  const users = userDocs
+    .filter(d => d.exists())
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "")); 
 
-  // 2️⃣ Fetch successful payouts in this cycle
   const payoutsSnap = await getDocs(
     query(
       collection(db, "payouts"),
+      where("groupId", "==", groupId),
       where("cycleId", "==", currentCycleId),
       where("status", "==", "success")
     )
   );
 
-  const paidMemberIds = payoutsSnap.docs.map(d => d.data().memberId);
+  const paidMemberIds = payoutsSnap.docs.map(d => d.data().userId);
 
-  // 3️⃣ Pick next unpaid member
-  const nextMember = members.find(m => !paidMemberIds.includes(m.id));
-  console.log("Next member to pay:", nextMember?.member ?? "None");
+  const nextMember = users.find(m => !paidMemberIds.includes(m.id));
   if (!nextMember) throw new Error("All members already paid this cycle");
 
-  // 4️⃣ Create pending payout record
   const payoutRef = await addDoc(collection(db, "payouts"), {
-    memberId: nextMember.id,
+    groupId,
+    userId: nextMember.id,
+    userName: nextMember.name || nextMember.email,
     amount,
     cycleId: currentCycleId,
     status: "pending",
     createdAt: serverTimestamp(),
   });
 
-  // 5️⃣ Fetch bank details
   const bankSnap = await getDocs(
     query(
       collection(db, "Bank Details"),
@@ -175,14 +136,18 @@ export const initiatePayout = async ({ amount, currentCycleId }) => {
     )
   );
 
+  let bankDetails;
+  
   if (bankSnap.empty) {
-    await updateDoc(payoutRef, { status: "failed", reason: "Missing bank details" });
-    throw new Error("Member has no bank details");
+    bankDetails = {
+      accountName: nextMember.name || nextMember.email,
+      accountNumber: "0000000000",
+      bankCode: "000"
+    };
+  } else {
+    bankDetails = bankSnap.docs[0].data();
   }
 
-  const bankDetails = bankSnap.docs[0].data();
-
-  // 6️⃣ Resolve bank account → Paystack recipient code
   let recipientCode;
   try {
     recipientCode = await createTransferRecipient(bankDetails);
@@ -191,33 +156,24 @@ export const initiatePayout = async ({ amount, currentCycleId }) => {
     throw err;
   }
 
-  // 7️⃣ Execute transfer via Paystack
-  let reference, newBalance;
+  let reference;
   try {
-    ({ reference, newBalance } = await paystackTransfer({
+    const transferResult = await paystackTransfer({
       recipientCode,
-      amountNaira: amount,
+      amountZAR: amount,
       payoutId: payoutRef.id,
-    }));
+    });
+    reference = transferResult.reference;
   } catch (err) {
     await updateDoc(payoutRef, { status: "failed", reason: err.message });
     throw new Error(`Payment failed: ${err.message}`);
   }
 
-  // 8️⃣ Mark payout as successful
   await updateDoc(payoutRef, {
     status: "success",
     paidAt: serverTimestamp(),
     reference,
   });
-
-  // 9️⃣ Update treasury balance
-  //await updateDoc(doc(db, "treasury", "main"), { balance: newBalance });
- await setDoc(
-  doc(db, "total collected", "YOUR_DOCUMENT_ID"),
-  { amount: increment(-amount) },
-  { merge: true }
-);
 
   return true;
 };

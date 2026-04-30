@@ -7,7 +7,7 @@ function GroupList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [requestingGroupId, setRequestingGroupId] = useState(null);
-  const [messageMap, setMessageMap] = useState({}); // { groupId: { type, text } }
+  const [messageMap, setMessageMap] = useState({}); 
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -17,9 +17,7 @@ function GroupList() {
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch(
-        "https://stockvel-2kvp.onrender.com/api/groups",
-      );
+      const response = await fetch("https://stockvel-2kvp.onrender.com/api/groups");
       if (!response.ok) {
         throw new Error("Failed to fetch groups");
       }
@@ -46,7 +44,6 @@ function GroupList() {
       [groupId]: { type, text },
     }));
 
-    // Auto-clear message after 4 seconds
     setTimeout(() => {
       clearMessage(groupId);
     }, 4000);
@@ -58,7 +55,6 @@ function GroupList() {
       return;
     }
 
-    // Prevent multiple requests for the same group
     if (requestingGroupId === groupId) {
       return;
     }
@@ -67,14 +63,14 @@ function GroupList() {
 
     try {
       const response = await fetch(
-        "https://stockvel-2kvp.onrender.com/api/groups/${groupId}/join",
+        `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/join`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ userId: user.uid }),
-        },
+        }
       );
 
       const data = await response.json();
@@ -85,7 +81,6 @@ function GroupList() {
 
       setMessage(groupId, "success", data.message);
 
-      // Refetch groups to update member count and button state
       setTimeout(() => {
         fetchGroups();
       }, 500);
@@ -104,8 +99,7 @@ function GroupList() {
       {groups.map((group) => {
         const msg = messageMap[group.id];
         const isRequesting = requestingGroupId === group.id;
-        const isFull =
-          (group.members ? group.members.length : 0) >= group.maxMembers;
+        const isFull = (group.members ? group.members.length : 0) >= group.maxMembers;
         const isMember = group.members && group.members.includes(user?.uid);
 
         return (
@@ -122,8 +116,7 @@ function GroupList() {
               <h3>{group.groupName}</h3>
               <p>Contribution: R{group.contributionAmount}</p>
               <p>
-                Members: {group.members ? group.members.length : 0} /{" "}
-                {group.maxMembers}
+                Members: {group.members ? group.members.length : 0} / {group.maxMembers}
               </p>
               <small>
                 Created: {new Date(group.createdAt).toLocaleDateString()}
