@@ -105,16 +105,19 @@ export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) =>
     .map(d => ({ id: d.id, ...d.data() }))
     .sort((a, b) => (a.name || "").localeCompare(b.name || "")); 
 
+  // FIXED: Single query to prevent Firebase Missing Index errors
   const payoutsSnap = await getDocs(
     query(
       collection(db, "payouts"),
-      where("groupId", "==", groupId),
-      where("cycleId", "==", currentCycleId),
-      where("status", "==", "success")
+      where("groupId", "==", groupId)
     )
   );
 
-  const paidMemberIds = payoutsSnap.docs.map(d => d.data().userId);
+  // FIXED: Filter the cycle and success status in memory
+  const paidMemberIds = payoutsSnap.docs
+    .map(d => d.data())
+    .filter(p => p.cycleId === currentCycleId && p.status === "success")
+    .map(p => p.userId);
 
   const nextMember = users.find(m => !paidMemberIds.includes(m.id));
   if (!nextMember) throw new Error("All members already paid this cycle");
