@@ -5,6 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const groupRoutes = require("./routes/groups");
 const webhookRoutes = require("./routes/webhook");
+const ratesRoutes = require("./routes/rates");
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use(cors(corsOptions));
 app.use("/api/webhook", webhookRoutes);
 app.use(express.json());
 app.use("/api/groups", groupRoutes);
+app.use("/api/rates", ratesRoutes);
 
 const PORT = process.env.PORT || 5000;
 
