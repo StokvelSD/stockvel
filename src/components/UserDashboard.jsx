@@ -14,6 +14,7 @@ import {
   where,
 } from "firebase/firestore";
 import MyGroups from "../components/MyGroups";
+import SavingsProjection from "./SavingsProjection";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -499,6 +500,8 @@ const UserDashboard = () => {
           <h2>My Dashboard</h2>
           <p>Track your stokvel savings and upcoming contributions.</p>
         </div>
+
+        <SavingsProjection userBalance={totalPaid || 5000} />
 
         {/* Browse Groups Button */}
         {/* Buttons row */}
