@@ -4,8 +4,7 @@ import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-// ── Reusable Field wrapper
-
+// ── Reusable Field wrapper ──
 function Field({ label, children, isLast }) {
   return (
     <section className={`field ${isLast ? "field-last" : ""}`}>
@@ -16,7 +15,6 @@ function Field({ label, children, isLast }) {
 }
 
 // ── Reusable Select wrapper ──
-
 function SelectField({ label, id, options, value, onChange, isLast }) {
   return (
     <Field label={label} isLast={isLast}>
@@ -41,126 +39,198 @@ function SelectField({ label, id, options, value, onChange, isLast }) {
   );
 }
 
-// ── VIEW 2 — Configure form for a selected group ──
+// ── Per-section feedback banner ──
+function SaveBanner({ feedback }) {
+  if (!feedback) return null;
+  return (
+    <div
+      className={`save-banner ${
+        feedback.status === "success"
+          ? "save-banner--success"
+          : "save-banner--error"
+      }`}
+    >
+      {feedback.status === "success" ? "✓ " : "✕ "}
+      {feedback.message}
+    </div>
+  );
+}
 
+// ── Per-section card footer (divider + banner + button) ──
+function CardFooter({ onSave, saving, label, feedback }) {
+  return (
+    <>
+      <div className="card-divider" />
+      <div className="card-footer">
+        <SaveBanner feedback={feedback} />
+        <button
+          className="save-btn"
+          onClick={onSave}
+          disabled={saving}
+          style={{ opacity: saving ? 0.7 : 1 }}
+        >
+          {saving ? "Saving…" : label}
+        </button>
+      </div>
+    </>
+  );
+}
+
+// ── VIEW 2 — Configure form for a selected group ──
 function ConfigureForm({ group, onBack }) {
-  // Group config state
+  // ── Payout rules ──
   const [payoutOrder, setPayoutOrder] = useState(group.payoutOrder || "");
   const [latePenalty, setLatePenalty] = useState(group.latePenalty || "");
   const [gracePeriod, setGracePeriod] = useState(group.gracePeriod || "");
+  const [payoutSaving, setPayoutSaving] = useState(false);
+  const [payoutFeedback, setPayoutFeedback] = useState(null);
+  const [payoutErrors, setPayoutErrors] = useState({});
+
+  // ── Meeting schedule ──
   const [meetingFreq, setMeetingFreq] = useState(group.meetingFrequency || "");
   const [meetingDay, setMeetingDay] = useState(group.meetingDay || "");
-
-  // Meeting schedule state
   const [meetingTitle, setMeetingTitle] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingLocation, setMeetingLocation] = useState("");
   const [meetingAgenda, setMeetingAgenda] = useState("");
+  const [meetingSaving, setMeetingSaving] = useState(false);
+  const [meetingFeedback, setMeetingFeedback] = useState(null);
+  const [meetingErrors, setMeetingErrors] = useState({});
 
-  // Announcement state
+  // ── Announcement ──
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  const [annSaving, setAnnSaving] = useState(false);
+  const [annFeedback, setAnnFeedback] = useState(null);
+  const [annErrors, setAnnErrors] = useState({});
 
-  // UI state
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  const validate = () => {
-    const e = {};
-
-    // Payout rules — always required
-    if (!latePenalty) e.latePenalty = "This field is required.";
-    if (!gracePeriod) e.gracePeriod = "This field is required.";
-
-    // Meeting fields — all required
-    if (!meetingFreq) e.meetingFreq = "This field is required.";
-    if (!meetingDay) e.meetingDay = "This field is required.";
-    if (!meetingTitle) e.meetingTitle = "This field is required.";
-    if (!meetingDate) e.meetingDate = "This field is required.";
-    if (!meetingLocation) e.meetingLocation = "This field is required.";
-    if (!meetingAgenda) e.meetingAgenda = "This field is required.";
-
-    // Announcement fields — all required
-    if (!announcementTitle) e.announcementTitle = "This field is required.";
-    if (!announcement) e.announcement = "This field is required.";
-
-    return e;
+  const flash = (setter, status, message) => {
+    setter({ status, message });
+    setTimeout(() => setter(null), 4000);
   };
 
-  const handleSave = async () => {
-    const newErrors = validate();
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) return;
+  // ── Save payout rules only ──
+  const handleSavePayout = async () => {
+    const e = {};
+    if (!latePenalty) e.latePenalty = "This field is required.";
+    if (!gracePeriod) e.gracePeriod = "This field is required.";
+    setPayoutErrors(e);
+    if (Object.keys(e).length > 0) return;
 
-    setSaving(true);
+    setPayoutSaving(true);
     try {
-      //  Save group config directly to Firestore (groups collection)
       await updateDoc(doc(db, "groups", group.id), {
         payoutOrder,
         latePenalty: Number(latePenalty),
         gracePeriod: Number(gracePeriod),
+      });
+      flash(setPayoutFeedback, "success", "Payout rules saved.");
+    } catch (err) {
+      flash(
+        setPayoutFeedback,
+        "error",
+        err.message || "Failed to save payout rules.",
+      );
+    } finally {
+      setPayoutSaving(false);
+    }
+  };
+
+  // ── Save meeting only ──
+  const handleSaveMeeting = async () => {
+    const e = {};
+    if (!meetingFreq) e.meetingFreq = "This field is required.";
+    if (!meetingDay) e.meetingDay = "This field is required.";
+    if (!meetingTitle) e.meetingTitle = "This field is required.";
+    if (!meetingDate) e.meetingDate = "This field is required.";
+    setMeetingErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setMeetingSaving(true);
+    try {
+      await updateDoc(doc(db, "groups", group.id), {
         meetingFrequency: meetingFreq,
         meetingDay,
       });
 
-      //  Schedule meeting via backend API (saves to meetings collection)
-      if (meetingTitle && meetingDate) {
-        const meetingRes = await fetch(
-          `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/schedule-meeting`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: meetingTitle,
-              date: new Date(meetingDate).toISOString(),
-              location: meetingLocation || "",
-              agenda: meetingAgenda || "",
-              status: "scheduled",
-            }),
-          },
-        );
-        if (!meetingRes.ok) {
-          const err = await meetingRes.json();
-          console.log("Meeting error from backend:", err);
-          throw new Error(err.error || "Failed to schedule meeting");
-        }
+      const res = await fetch(
+        `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/schedule-meeting`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: meetingTitle,
+            date: new Date(meetingDate).toISOString(),
+            location: meetingLocation || "",
+            agenda: meetingAgenda || "",
+            groupName: group.groupName,
+            status: "scheduled",
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to schedule meeting");
       }
 
-      // 3 — Send announcement via backend API (saves to announcements collection)
-      if (announcementTitle && announcement.trim()) {
-        const announcementRes = await fetch(
-          `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/announcements`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: announcementTitle,
-              message: announcement,
-            }),
-          },
-        );
-        if (!announcementRes.ok) {
-          const err = await announcementRes.json();
-          throw new Error(err.error || "Failed to send announcement");
-        }
-      }
-
-      // Reset meeting + announcement fields after successful save
       setMeetingTitle("");
       setMeetingDate("");
       setMeetingLocation("");
       setMeetingAgenda("");
+      flash(
+        setMeetingFeedback,
+        "success",
+        "Meeting scheduled and members notified.",
+      );
+    } catch (err) {
+      flash(
+        setMeetingFeedback,
+        "error",
+        err.message || "Failed to schedule meeting.",
+      );
+    } finally {
+      setMeetingSaving(false);
+    }
+  };
+
+  // ── Save announcement only ──
+  const handleSaveAnnouncement = async () => {
+    const e = {};
+    if (!announcementTitle) e.announcementTitle = "This field is required.";
+    if (!announcement.trim()) e.announcement = "This field is required.";
+    setAnnErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setAnnSaving(true);
+    try {
+      const res = await fetch(
+        `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/announcements`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: announcementTitle,
+            message: announcement,
+            groupName: group.groupName,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to send announcement");
+      }
+
       setAnnouncementTitle("");
       setAnnouncement("");
-
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      flash(setAnnFeedback, "success", "Announcement sent to all members.");
     } catch (err) {
-      console.error(err);
-      alert(err.message || "Failed to save changes. Please try again.");
+      flash(
+        setAnnFeedback,
+        "error",
+        err.message || "Failed to send announcement.",
+      );
     } finally {
-      setSaving(false);
+      setAnnSaving(false);
     }
   };
 
@@ -176,24 +246,6 @@ function ConfigureForm({ group, onBack }) {
         </section>
 
         <p className="group-name">{group.groupName}</p>
-
-        {/* ── Success banner ── */}
-        {saved && (
-          <div
-            style={{
-              background: "#dcfce7",
-              color: "#15803d",
-              border: "1px solid #86efac",
-              borderRadius: "8px",
-              padding: "0.65rem 1rem",
-              fontSize: "0.875rem",
-              fontWeight: 600,
-              marginBottom: "1rem",
-            }}
-          >
-            ✓ Changes saved successfully!
-          </div>
-        )}
 
         {/* ── Payout Rules ── */}
         <section className="card">
@@ -219,11 +271,11 @@ function ConfigureForm({ group, onBack }) {
               value={latePenalty}
               onChange={(e) => {
                 setLatePenalty(e.target.value);
-                setErrors((prev) => ({ ...prev, latePenalty: "" }));
+                setPayoutErrors((p) => ({ ...p, latePenalty: "" }));
               }}
             />
-            {errors.latePenalty && (
-              <span className="error">{errors.latePenalty}</span>
+            {payoutErrors.latePenalty && (
+              <span className="error">{payoutErrors.latePenalty}</span>
             )}
           </Field>
 
@@ -234,18 +286,26 @@ function ConfigureForm({ group, onBack }) {
               value={gracePeriod}
               onChange={(e) => {
                 setGracePeriod(e.target.value);
-                setErrors((prev) => ({ ...prev, gracePeriod: "" }));
+                setPayoutErrors((p) => ({ ...p, gracePeriod: "" }));
               }}
             />
-            {errors.gracePeriod && (
-              <span className="error">{errors.gracePeriod}</span>
+            {payoutErrors.gracePeriod && (
+              <span className="error">{payoutErrors.gracePeriod}</span>
             )}
           </Field>
+
+          <CardFooter
+            onSave={handleSavePayout}
+            saving={payoutSaving}
+            label="Save payout rules"
+            feedback={payoutFeedback}
+          />
         </section>
 
         {/* ── Meeting Schedule ── */}
         <section className="card">
-          <p className="card-title">Meeting schedule</p>
+          <p className="card-title">Schedule a meeting</p>
+
           <SelectField
             label="Meeting frequency"
             id="meeting-frequency"
@@ -253,11 +313,11 @@ function ConfigureForm({ group, onBack }) {
             value={meetingFreq}
             onChange={(val) => {
               setMeetingFreq(val);
-              setErrors((prev) => ({ ...prev, meetingFreq: "" }));
+              setMeetingErrors((p) => ({ ...p, meetingFreq: "" }));
             }}
           />
-          {errors.meetingFreq && (
-            <span className="error">{errors.meetingFreq}</span>
+          {meetingErrors.meetingFreq && (
+            <span className="error">{meetingErrors.meetingFreq}</span>
           )}
 
           <SelectField
@@ -273,12 +333,13 @@ function ConfigureForm({ group, onBack }) {
             value={meetingDay}
             onChange={(val) => {
               setMeetingDay(val);
-              setErrors((prev) => ({ ...prev, meetingDay: "" }));
+              setMeetingErrors((p) => ({ ...p, meetingDay: "" }));
             }}
           />
-          {errors.meetingDay && (
-            <span className="error">{errors.meetingDay}</span>
+          {meetingErrors.meetingDay && (
+            <span className="error">{meetingErrors.meetingDay}</span>
           )}
+
           <Field label="Meeting title">
             <input
               type="text"
@@ -286,11 +347,11 @@ function ConfigureForm({ group, onBack }) {
               value={meetingTitle}
               onChange={(e) => {
                 setMeetingTitle(e.target.value);
-                setErrors((prev) => ({ ...prev, meetingTitle: "" }));
+                setMeetingErrors((p) => ({ ...p, meetingTitle: "" }));
               }}
             />
-            {errors.meetingTitle && (
-              <span className="error">{errors.meetingTitle}</span>
+            {meetingErrors.meetingTitle && (
+              <span className="error">{meetingErrors.meetingTitle}</span>
             )}
           </Field>
 
@@ -300,11 +361,11 @@ function ConfigureForm({ group, onBack }) {
               value={meetingDate}
               onChange={(e) => {
                 setMeetingDate(e.target.value);
-                setErrors((prev) => ({ ...prev, meetingDate: "" }));
+                setMeetingErrors((p) => ({ ...p, meetingDate: "" }));
               }}
             />
-            {errors.meetingDate && (
-              <span className="error">{errors.meetingDate}</span>
+            {meetingErrors.meetingDate && (
+              <span className="error">{meetingErrors.meetingDate}</span>
             )}
           </Field>
 
@@ -324,6 +385,13 @@ function ConfigureForm({ group, onBack }) {
               onChange={(e) => setMeetingAgenda(e.target.value)}
             />
           </Field>
+
+          <CardFooter
+            onSave={handleSaveMeeting}
+            saving={meetingSaving}
+            label="Schedule meeting"
+            feedback={meetingFeedback}
+          />
         </section>
 
         {/* ── Broadcast Announcement ── */}
@@ -337,11 +405,11 @@ function ConfigureForm({ group, onBack }) {
               value={announcementTitle}
               onChange={(e) => {
                 setAnnouncementTitle(e.target.value);
-                setErrors((prev) => ({ ...prev, announcementTitle: "" }));
+                setAnnErrors((p) => ({ ...p, announcementTitle: "" }));
               }}
             />
-            {errors.announcementTitle && (
-              <span className="error">{errors.announcementTitle}</span>
+            {annErrors.announcementTitle && (
+              <span className="error">{annErrors.announcementTitle}</span>
             )}
           </Field>
 
@@ -351,31 +419,27 @@ function ConfigureForm({ group, onBack }) {
               value={announcement}
               onChange={(e) => {
                 setAnnouncement(e.target.value);
-                setErrors((prev) => ({ ...prev, announcement: "" }));
+                setAnnErrors((p) => ({ ...p, announcement: "" }));
               }}
             />
-            {errors.announcement && (
-              <span className="error">{errors.announcement}</span>
+            {annErrors.announcement && (
+              <span className="error">{annErrors.announcement}</span>
             )}
           </Field>
-        </section>
 
-        {/* ── Save button ── */}
-        <button
-          className="save-btn"
-          onClick={handleSave}
-          disabled={saving}
-          style={{ opacity: saving ? 0.7 : 1 }}
-        >
-          {saving ? "Saving…" : "Save changes"}
-        </button>
+          <CardFooter
+            onSave={handleSaveAnnouncement}
+            saving={annSaving}
+            label="Send announcement"
+            feedback={annFeedback}
+          />
+        </section>
       </section>
     </section>
   );
 }
 
-// ── VIEW 1 — List of all active groups ───
-
+// ── VIEW 1 — List of all active groups ──
 function GroupList({ onSelect }) {
   const { user } = useAuth();
   const [groups, setGroups] = useState([]);
@@ -386,22 +450,20 @@ function GroupList({ onSelect }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch all groups
         const res = await fetch(
           "https://stockvel-2kvp.onrender.com/api/groups",
         );
         if (!res.ok) throw new Error("Failed to fetch groups");
         const data = await res.json();
-        
-        // Fetch user's groups from their document
+
         if (user) {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          const userDoc = await getDoc(doc(db, "users", user.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
             setUserGroupIds(userData.groups || []);
           }
         }
-        
+
         setGroups(data);
       } catch (err) {
         setError(err.message);
@@ -412,8 +474,7 @@ function GroupList({ onSelect }) {
     fetchData();
   }, [user]);
 
-  // Filter groups to only show groups the user is a member of
-  const userGroups = groups.filter(g => {
+  const userGroups = groups.filter((g) => {
     if (userGroupIds.includes(g.id)) return true;
     if (g.members && g.members.includes(user?.uid)) return true;
     return false;
@@ -545,14 +606,13 @@ function GroupList({ onSelect }) {
   );
 }
 
-// ── ROOT EXPORT ──────────────
-
+// ── ROOT EXPORT ──
 export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
-  const [loadingPreselected, setLoadingPreselected] = useState(!!preselectedGroupId);
+  const [loadingPreselected, setLoadingPreselected] =
+    useState(!!preselectedGroupId);
   const navigate = useNavigate();
 
-  // If preselectedGroupId is provided, fetch and select that group directly
   useEffect(() => {
     if (preselectedGroupId) {
       const fetchGroup = async () => {
@@ -565,7 +625,7 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
             setSelectedGroup(groupData);
           }
         } catch (err) {
-          console.error('Failed to fetch preselected group:', err);
+          console.error("Failed to fetch preselected group:", err);
         } finally {
           setLoadingPreselected(false);
         }
@@ -590,7 +650,7 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
         group={selectedGroup}
         onBack={() => {
           if (preselectedGroupId) {
-            navigate('/browse-groups');
+            navigate("/browse-groups");
           } else {
             setSelectedGroup(null);
           }

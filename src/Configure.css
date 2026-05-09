@@ -19,7 +19,7 @@ body {
 }
 
 /* =====================
-   Page Container — 50% of screen
+   Page Container
    ===================== */
 .page {
   width: 50%;
@@ -86,14 +86,16 @@ body {
   padding: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
 }
 
 .card-title {
   font-size: 15px;
   font-weight: 600;
   color: #1a1a1a;
-  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f0efeb;
+  margin-bottom: 0.25rem;
 }
 
 /* =====================
@@ -201,7 +203,7 @@ body {
 }
 
 /* =====================
-   Error
+   Error text
    ===================== */
 .error {
   font-size: 12px;
@@ -209,18 +211,16 @@ body {
 }
 
 /* =====================
-   Footer & Save Button
+   Per-section save button
+   — sits inside each card,
+     aligned to the right
    ===================== */
-.footer {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .save-btn {
-  padding: 14px 40px;
+  align-self: flex-end;
+  padding: 11px 28px;
   background: #1a7f54;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   font-family: inherit;
   border: none;
@@ -228,17 +228,82 @@ body {
   cursor: pointer;
   transition:
     background 0.2s ease,
-    transform 0.1s ease;
+    transform 0.1s ease,
+    opacity 0.2s ease;
   letter-spacing: 0.02em;
+  margin-top: 0.25rem;
 }
 
-.save-btn:hover {
+.save-btn:hover:not(:disabled) {
   background: #166b46;
 }
 
-.save-btn:active {
+.save-btn:active:not(:disabled) {
   background: #125a3c;
   transform: scale(0.98);
+}
+
+.save-btn:disabled {
+  cursor: not-allowed;
+}
+
+/* =====================
+   Save feedback banner
+   — success & error variants,
+     scoped per card
+   ===================== */
+.save-banner {
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  animation: banner-in 0.2s ease;
+}
+
+.save-banner--success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.save-banner--error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+@keyframes banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =====================
+   Card footer row
+   — keeps button right-aligned
+     and banner left of it if needed
+   ===================== */
+.card-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.25rem;
+}
+
+/* =====================
+   Divider between card body
+   and its footer area
+   ===================== */
+.card-divider {
+  height: 1px;
+  background: #f0efeb;
+  margin: 0.25rem 0;
 }
 
 /* =====================
@@ -254,11 +319,9 @@ body {
     padding: 1.5rem;
   }
 
-  .footer {
-    justify-content: stretch;
-  }
-
   .save-btn {
+    align-self: stretch;
     width: 100%;
+    text-align: center;
   }
 }
