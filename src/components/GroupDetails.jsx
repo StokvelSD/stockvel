@@ -13,8 +13,6 @@ function GroupDetails() {
   const [group, setGroup] = useState(null);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]);
-  const [paymentHistory, setPaymentHistory] = useState([]);
-  const [payoutHistory, setPayoutHistory] = useState([]);
   const [payoutProjections, setPayoutProjections] = useState([]);
   const [saRates, setSaRates] = useState({ repo: 8.25, prime: 11.75 });
   const paymentTriggered = useRef(false);
@@ -38,8 +36,6 @@ function GroupDetails() {
   useEffect(() => {
     fetchSaRates();
     fetchGroupDetails();
-    fetchPaymentHistory();
-    fetchPayoutHistory();
   }, [id, user]);
 
   useEffect(() => {
@@ -49,7 +45,6 @@ function GroupDetails() {
       initializePayment(
         () => {
           alert("Payment successful! Waiting for the server to confirm your transaction.");
-          fetchPaymentHistory();
         },
         () => {
           console.log('User closed the payment window');
@@ -147,44 +142,8 @@ function GroupDetails() {
     setPayoutProjections(projections);
   };
 
-  const fetchPaymentHistory = async () => {
-    try {
-      const paymentsQuery = query(
-        collection(db, 'payments'),
-        where('groupId', '==', id),
-        where('userId', '==', user?.uid)
-      );
-      const paymentsSnap = await getDocs(paymentsQuery);
-      const paymentsData = paymentsSnap.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setPaymentHistory(paymentsData.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
-    } catch (err) {
-      console.error('Failed to fetch payment history:', err);
-    }
-  };
-
-  const fetchPayoutHistory = async () => {
-    try {
-      const payoutsQuery = query(
-        collection(db, 'payouts'),
-        where('groupId', '==', id)
-      );
-      const payoutsSnap = await getDocs(payoutsQuery);
-      const payoutsData = payoutsSnap.docs
-        .map(doc => ({ id: doc.id, ...doc.data() }))
-        .filter(p => p.status === 'success');
-        
-      setPayoutHistory(payoutsData.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
-    } catch (err) {
-      console.error('Failed to fetch payout history:', err);
-    }
-  };
-
   const handlePaystackSuccessAction = () => {
     alert("Payment successful! Waiting for the server to confirm your transaction.");
-    fetchPaymentHistory();
   };
 
   const handlePaystackCloseAction = () => {
@@ -200,36 +159,14 @@ function GroupDetails() {
 
   const myProjection = payoutProjections.find(p => p.memberId === user?.uid);
 
-  if (loading) {
-    return (
-      <div className="dashboard-page">
-        <div className="dashboard-inner">
-          <p>Loading group details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!group) {
-    return (
-      <div className="dashboard-page">
-        <div className="dashboard-inner">
-          <p>Group not found</p>
-          <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="dashboard-page"><div className="dashboard-inner"><p>Loading group details...</p></div></div>;
+  if (!group) return <div className="dashboard-page"><div className="dashboard-inner"><p>Group not found</p><button className="btn btn-primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</button></div></div>;
 
   return (
     <div className="dashboard-page">
       <div className="dashboard-inner">
         <div style={{ marginBottom: '1.5rem' }}>
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>
-            ← Back
-          </button>
+          <button className="btn btn-outline" onClick={() => navigate(-1)}>← Back</button>
         </div>
 
         <div className="section-card">
@@ -289,57 +226,6 @@ function GroupDetails() {
         )}
 
         <div className="section-card">
-          <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Full Payout Schedule</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-            {payoutProjections.map((projection) => {
-              const alreadyPaid = payoutHistory.find(p => p.userId === projection.memberId || p.memberId === projection.memberId);
-              const isMe = projection.memberId === user?.uid;
-              return (
-                <div key={projection.memberId} style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '8px',
-                  border: isMe ? '2px solid #2c6e2f' : '1px solid var(--border)',
-                  backgroundColor: isMe ? '#f0f9f0' : 'white'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{
-                      width: '28px', height: '28px', borderRadius: '50%',
-                      backgroundColor: alreadyPaid ? '#2c6e2f' : '#e2e8f0',
-                      color: alreadyPaid ? 'white' : '#64748b',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, fontSize: '0.8rem'
-                    }}>
-                      {projection.position}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>
-                        {projection.memberName}
-                        {isMe && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '12px', backgroundColor: '#e0e7ff', color: '#4338ca' }}>You</span>}
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                        {projection.payoutDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {projection.amount.toFixed(2)}</div>
-                      <div style={{ fontSize: '0.7rem', color: '#15803d' }}>includes R{projection.growth.toFixed(2)} interest</div>
-                    </div>
-                    <span className={`badge ${alreadyPaid ? 'badge-success' : 'badge-warning'}`}>
-                      {alreadyPaid ? 'PAID OUT' : 'UPCOMING'}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="section-card">
           <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Group Members ({members.length})</h3>
           {members.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
@@ -389,56 +275,6 @@ function GroupDetails() {
             </div>
           )}
         </div>
-
-        {payoutHistory.length > 0 && (
-          <div className="section-card">
-            <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Payout History</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-              {payoutHistory.map(payout => (
-                <div key={payout.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '8px'
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{payout.userName || payout.memberId}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {payout.createdAt?.toDate?.().toLocaleDateString('en-ZA')}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {payout.amount}</div>
-                    <span className="badge badge-success">DISBURSED</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {paymentHistory.length > 0 && (
-          <div className="section-card">
-            <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>My Payment History</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-              {paymentHistory.map(payment => (
-                <div key={payment.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '8px'
-                }}>
-                  <div>
-                    <div style={{ fontWeight: 600 }}>R {payment.amount}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {payment.createdAt?.toDate().toLocaleDateString()}
-                    </div>
-                  </div>
-                  <span className={`badge ${payment.status === 'paid' ? 'badge-success' : 'badge-warning'}`}>
-                    {(payment.status || 'pending').toUpperCase()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );

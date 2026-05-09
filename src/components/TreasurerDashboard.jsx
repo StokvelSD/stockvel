@@ -26,6 +26,9 @@ export default function TreasurerDashboard() {
   const [groupDocData, setGroupDocData] = useState(null);
   const [nextRecipient, setNextRecipient] = useState(null);
   const [saRates, setSaRates] = useState({ repo: 8.25, prime: 11.75 });
+  
+  const [payoutHistory, setPayoutHistory] = useState([]);
+  const [payoutProjections, setPayoutProjections] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -49,6 +52,48 @@ export default function TreasurerDashboard() {
       console.error('SARB Fetch Error (using fallbacks):', err);
       setSaRates({ repo: 8.25, prime: 11.75 });
     }
+  };
+
+  const calculateProjections = (groupData, sortedMembers, primeRate) => {
+    const frequency = groupData.meetingFrequency?.toLowerCase() || 'monthly';
+    const createdAt = groupData.createdAt?.toDate
+      ? groupData.createdAt.toDate()
+      : new Date(groupData.createdAt);
+
+    const basePotAmount = (groupData.contributionAmount || 0) * sortedMembers.length;
+    const monthlyInterestRate = (primeRate / 100) / 12;
+
+    const getNextPayoutDate = (index) => {
+      const date = new Date(createdAt);
+      if (frequency === 'monthly') {
+        date.setMonth(date.getMonth() + index + 1);
+      } else if (frequency === 'quarterly') {
+        date.setMonth(date.getMonth() + (index + 1) * 3);
+      } else if (frequency === 'weekly') {
+        date.setDate(date.getDate() + (index + 1) * 7);
+      } else {
+        date.setMonth(date.getMonth() + index + 1);
+      }
+      return date;
+    };
+
+    const projections = sortedMembers.map((member, index) => {
+      const monthsAccrued = index + 1;
+      const projectedGrowth = basePotAmount * Math.pow(1 + monthlyInterestRate, monthsAccrued) - basePotAmount;
+      const totalExpectedAmount = basePotAmount + projectedGrowth;
+
+      return {
+        memberId: member.id,
+        memberName: member.name || member.email,
+        position: index + 1,
+        payoutDate: getNextPayoutDate(index),
+        baseAmount: basePotAmount,
+        growth: projectedGrowth,
+        amount: totalExpectedAmount,
+      };
+    });
+
+    setPayoutProjections(projections);
   };
 
   const fetchDashboardData = async () => {
@@ -78,9 +123,11 @@ export default function TreasurerDashboard() {
       const payments = paymentsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
       const payoutsSnap = await getDocs(query(collection(db, 'payouts'), where('groupId', '==', currentGroupId)));
-      const payouts = payoutsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.status === 'success');
+      const payoutsData = payoutsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => p.status === 'success');
+      
+      setPayoutHistory(payoutsData.sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
 
-      const paidOutIds = payouts.map(p => p.userId);
+      const paidOutIds = payoutsData.map(p => p.userId);
 
       const joined = sortedMembers.map(member => {
         const payment = payments.find(p => p.userId === member.id);
@@ -97,6 +144,9 @@ export default function TreasurerDashboard() {
       setTableData(joined);
       const nextPending = sortedMembers.find(m => !paidOutIds.includes(m.id));
       setNextRecipient(nextPending);
+      
+      calculateProjections(groupData, sortedMembers, saRates.prime);
+
     } catch (e) {
       console.error(e);
     } finally {
@@ -140,7 +190,6 @@ export default function TreasurerDashboard() {
     document.body.removeChild(link);
   };
 
-  // Calculations
   const totalCollected = tableData.filter(m => isPaidOrCompleted(m.status)).reduce((sum, m) => sum + (Number(m.amount) || 0), 0);
   const complianceRate = tableData.length ? Math.round((tableData.filter(m => isPaidOrCompleted(m.status)).length / tableData.length) * 100) : 0;
   
@@ -164,7 +213,6 @@ export default function TreasurerDashboard() {
     setSuccess('');
     setPayoutLoading(true);
     try {
-      // Pass the fully rounded interest-inclusive amount to Paystack
       const finalPayoutAmount = parseFloat(expectedPot.toFixed(2));
       await initiatePayout({ groupId: groupId, amount: finalPayoutAmount, currentCycleId: 1 });
       
@@ -237,7 +285,7 @@ export default function TreasurerDashboard() {
         </div>
       )}
 
-      <div className="dashboard-card">
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
         <h3>Member Ledger</h3>
         <div className="table-wrap">
           <table>
@@ -278,6 +326,81 @@ export default function TreasurerDashboard() {
           </table>
         </div>
       </div>
+
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
+        <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Full Payout Schedule</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+          {payoutProjections.map((projection) => {
+            const alreadyPaid = payoutHistory.find(p => p.userId === projection.memberId || p.memberId === projection.memberId);
+            return (
+              <div key={projection.memberId} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0.75rem 1rem',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'white'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
+                    width: '28px', height: '28px', borderRadius: '50%',
+                    backgroundColor: alreadyPaid ? '#2c6e2f' : '#e2e8f0',
+                    color: alreadyPaid ? 'white' : '#64748b',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, fontSize: '0.8rem'
+                  }}>
+                    {projection.position}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>
+                      {projection.memberName}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      {projection.payoutDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {projection.amount.toFixed(2)}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#15803d' }}>includes R{projection.growth.toFixed(2)} interest</div>
+                  </div>
+                  <span className={`badge ${alreadyPaid ? 'badge-success' : 'badge-warning'}`}>
+                    {alreadyPaid ? 'PAID OUT' : 'UPCOMING'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {payoutHistory.length > 0 && (
+        <div className="dashboard-card">
+          <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Payout History</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            {payoutHistory.map(payout => (
+              <div key={payout.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '8px'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{payout.userName || payout.memberId}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    {payout.createdAt?.toDate?.().toLocaleDateString('en-ZA')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {payout.amount}</div>
+                  <span className="badge badge-success">DISBURSED</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
