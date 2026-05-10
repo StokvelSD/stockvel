@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
 import { collection, getDocs, doc, updateDoc, getDoc, addDoc, query, where } from 'firebase/firestore';
@@ -8,6 +8,7 @@ import '../index.css';
 function BrowseGroupsPage() {
   const { user, role } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [groups, setGroups] = useState([]);
   const [userGroupIds, setUserGroupIds] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -22,8 +23,6 @@ function BrowseGroupsPage() {
   const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [selectedGroupForMembers, setSelectedGroupForMembers] = useState(null);
   const [groupMembers, setGroupMembers] = useState([]);
-  const [showGroupOverview, setShowGroupOverview] = useState(false);
-  const [selectedGroupOverview, setSelectedGroupOverview] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(null);
   const [userPendingRequests, setUserPendingRequests] = useState([]);
   
@@ -81,6 +80,20 @@ function BrowseGroupsPage() {
       fetchJoinRequests();
     }
   }, [groups, userGroupIds, user, isAdmin, isTreasurer]);
+
+  // Check for addParticipant query parameter
+  useEffect(() => {
+    const addParticipantGroupId = searchParams.get('addParticipant');
+    if (addParticipantGroupId && groups.length > 0) {
+      const group = groups.find(g => g.id === addParticipantGroupId);
+      if (group && isUserMemberOfGroup(group) && (isAdmin || isTreasurer)) {
+        setSelectedGroupForAdd(addParticipantGroupId);
+        setShowAddParticipant(true);
+        // Clear the query parameter
+        navigate('/browse-groups', { replace: true });
+      }
+    }
+  }, [searchParams, groups, user, isAdmin, isTreasurer, navigate]);
 
   const fetchUserPendingRequests = async () => {
     if (!user) return;
@@ -442,13 +455,8 @@ function BrowseGroupsPage() {
     }
   };
 
-  const handleViewGroupOverview = async (group) => {
-    setSelectedGroupOverview(group);
-    setMembersPage(1); // Reset members pagination
-    setMyGroupsPage(1); // Reset my groups pagination
-    setOtherGroupsPage(1); // Reset other groups pagination
-    await fetchGroupMembers(group.id);
-    setShowGroupOverview(true);
+  const handleViewGroupOverview = (group) => {
+    navigate(`/group/${group.id}`);
   };
 
   // Add Participant Modal View
@@ -678,223 +686,6 @@ function BrowseGroupsPage() {
     );
   }
 
-  // Group Overview Modal (for all users - members and non-members)
-  if (showGroupOverview && selectedGroupOverview) {
-    const isMember = isUserMemberOfGroup(selectedGroupOverview);
-    
-    return (
-      <div className="dashboard-page">
-        <div className="dashboard-inner">
-          <div style={{ marginBottom: '1.5rem' }}>
-            <button 
-              className="btn btn-outline"
-              onClick={() => {
-                setShowGroupOverview(false);
-                setSelectedGroupOverview(null);
-                setGroupMembers([]);
-              }}
-            >
-              ← Back to Groups
-            </button>
-          </div>
-
-          <div className="section-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <h2 style={{ margin: 0 }}>{selectedGroupOverview.groupName || selectedGroupOverview.name}</h2>
-                <p style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-                  {selectedGroupOverview.description}
-                </p>
-              </div>
-              {isMember && (
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => navigate(`/group/${selectedGroupOverview.id}?action=pay`)}
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                >
-                  Pay R{selectedGroupOverview.contributionAmount || 0} Now
-                </button>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Members</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{groupMembers.length} / {selectedGroupOverview.maxMembers || '∞'}</div>
-              </div>
-              <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Contribution</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>R{selectedGroupOverview.contributionAmount || 0}</div>
-              </div>
-              <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Payout Cycle</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{selectedGroupOverview.meetingFrequency || 'Monthly'}</div>
-              </div>
-              <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', textAlign: 'center' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.25rem' }}>Duration</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>{selectedGroupOverview.duration || 12} months</div>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1.5rem' }}>
-              <h3>Members ({groupMembers.length})</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {groupMembers.length > 0 && (() => {
-                  const totalPages = Math.ceil(groupMembers.length / membersPerPage);
-                  const startIndex = (membersPage - 1) * membersPerPage;
-                  const paginatedMembers = groupMembers.slice(startIndex, startIndex + membersPerPage);
-                  
-                  return (
-                    <>
-                      {paginatedMembers.map((member) => (
-                        <div 
-                          key={member.id} 
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            padding: '0.75rem 1rem',
-                            backgroundColor: member.id === user?.uid ? '#f0f9ff' : 'white',
-                            border: '1px solid var(--border)',
-                            borderRadius: '8px'
-                          }}
-                        >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div style={{
-                              width: '40px',
-                              height: '40px',
-                              borderRadius: '50%',
-                              backgroundColor: member.role === 'admin' ? '#dc2626' : member.role === 'treasurer' ? '#f59e0b' : '#10b981',
-                              color: 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold',
-                              fontSize: '1rem'
-                            }}>
-                              {(member.name?.[0] || member.email?.[0] || '?').toUpperCase()}
-                            </div>
-                            <div>
-                              <div style={{ fontWeight: 600 }}>
-                                {member.name} {member.surname || ''}
-                                {member.id === user?.uid && (
-                                  <span style={{ 
-                                    marginLeft: '0.5rem', 
-                                    fontSize: '0.7rem', 
-                                    padding: '0.2rem 0.5rem', 
-                                    borderRadius: '12px',
-                                    backgroundColor: '#e0e7ff',
-                                    color: '#4338ca'
-                                  }}>
-                                    You
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                {member.email}
-                              </div>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{
-                              padding: '0.25rem 0.75rem',
-                              borderRadius: '12px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              backgroundColor: member.role === 'admin' ? '#fee2e2' : member.role === 'treasurer' ? '#fef3c7' : '#d1fae5',
-                              color: member.role === 'admin' ? '#dc2626' : member.role === 'treasurer' ? '#d97706' : '#059669',
-                              textTransform: 'capitalize'
-                            }}>
-                              {member.role || 'user'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {/* Pagination controls */}
-                      {totalPages > 1 && (
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
-                          <button 
-                            className="btn btn-outline"
-                            onClick={() => setMembersPage(p => Math.max(1, p - 1))}
-                            disabled={membersPage === 1}
-                            style={{ padding: '0.5rem 1rem' }}
-                          >
-                            ← Previous
-                          </button>
-                          <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                            Page {membersPage} of {totalPages}
-                          </span>
-                          <button 
-                            className="btn btn-outline"
-                            onClick={() => setMembersPage(p => Math.min(totalPages, p + 1))}
-                            disabled={membersPage === totalPages}
-                            style={{ padding: '0.5rem 1rem' }}
-                          >
-                            Next →
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-                {groupMembers.length === 0 && (
-                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
-                    No members in this group yet
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Show different buttons for members vs non-members */}
-            {isMember ? (
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {isAdmin && (
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => navigate(`/configure-group/${selectedGroupOverview.id}`)}
-                  >
-                    Configure Group
-                  </button>
-                )}
-                {(isAdmin || isTreasurer) && (
-                  <button 
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setSelectedGroupForAdd(selectedGroupOverview.id);
-                      setShowGroupOverview(false);
-                      setShowAddParticipant(true);
-                    }}
-                  >
-                    + Add Participant
-                  </button>
-                )}
-              </div>
-            ) : (
-              userPendingRequests.some(r => r.groupId === selectedGroupOverview.id) ? (
-                <button 
-                  className="btn btn-danger"
-                  onClick={() => handleCancelRequest(selectedGroupOverview.id, selectedGroupOverview.groupName || selectedGroupOverview.name)}
-                  disabled={sendingRequest === selectedGroupOverview.id}
-                >
-                  {sendingRequest === selectedGroupOverview.id ? 'Cancelling...' : 'Cancel Request'}
-                </button>
-              ) : (
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => handleSendRequest(selectedGroupOverview)}
-                  disabled={sendingRequest === selectedGroupOverview.id}
-                >
-                  {sendingRequest === selectedGroupOverview.id ? 'Sending...' : 'Request to Join'}
-                </button>
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // Main Browse Groups View
   return (
     <div className="dashboard-page">
@@ -978,7 +769,7 @@ function BrowseGroupsPage() {
                             </div>
                             
                             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              {/* View Group Button - Shows overview */}
+{/* View Group Button */}
                               <button 
                                 className="btn btn-outline"
                                 onClick={() => handleViewGroupOverview(group)}
@@ -1076,7 +867,7 @@ function BrowseGroupsPage() {
                             </div>
                             
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              {/* View Group - Shows overview for non-members */}
+                              {/* View Group */}
                               <button 
                                 className="btn btn-outline"
                                 onClick={() => handleViewGroupOverview(group)}

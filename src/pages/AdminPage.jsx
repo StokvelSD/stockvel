@@ -11,6 +11,8 @@ function AdminPage() {
   const [loading, setLoading]   = useState(true);
   const [updating, setUpdating] = useState(null);
   const [search, setSearch]     = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 10;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,6 +52,11 @@ function AdminPage() {
     (u.name?.toLowerCase().includes(search.toLowerCase()) ||
      u.email?.toLowerCase().includes(search.toLowerCase()))
   );
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const counts = {
     total:     users.length,
@@ -123,72 +130,110 @@ function AdminPage() {
           ) : filtered.length === 0 ? (
             <p style={{ color: 'var(--text-muted)', padding: '1rem 0' }}>No users found.</p>
           ) : (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Joined</th>
-                    <th>Current role</th>
-                    <th>Change role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map(u => (
-                    <tr key={u.id}>
-                      <td style={{ fontWeight: 600 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                          <div style={{
-                            width: 32, height: 32, borderRadius: '50%',
-                            background: 'var(--blue-light)',
-                            color: 'var(--blue-dark)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '0.75rem', fontWeight: 700, flexShrink: 0
-                          }}>
-                            {(u.name || u.email || '?')[0].toUpperCase()}
-                          </div>
-                          {u.name || '—'}
-                        </div>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{u.email}</td>
-                      <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-                        {u.createdAt?.toDate
-                          ? u.createdAt.toDate().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
-                          : '—'}
-                      </td>
-                      <td>
-                        <span className={`badge ${
-                          u.role === 'admin' ? 'badge-danger' :
-                          u.role === 'treasurer' ? 'badge-warning' :
-                          'badge-info'
-                        }`}>
-                          {u.role || 'user'}
-                        </span>
-                      </td>
-                      <td>
-                        <select
-                          className="form-control"
-                          style={{ width: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.85rem' }}
-                          value={u.role || 'user'}
-                          disabled={updating === u.id}
-                          onChange={e => handleRoleChange(u.id, e.target.value, u.role || 'user')}
-                        >
-                          {ROLES.map(r => (
-                            <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
-                          ))}
-                        </select>
-                        {updating === u.id && (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                            Saving…
-                          </span>
-                        )}
-                      </td>
+            <>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Joined</th>
+                      <th>Current role</th>
+                      <th>Change role</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const totalPages = Math.ceil(filtered.length / usersPerPage);
+                      const startIndex = (currentPage - 1) * usersPerPage;
+                      const paginatedUsers = filtered.slice(startIndex, startIndex + usersPerPage);
+                      
+                      return paginatedUsers.map(u => (
+                        <tr key={u.id}>
+                          <td style={{ fontWeight: 600 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: '50%',
+                                background: 'var(--blue-light)',
+                                color: 'var(--blue-dark)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: '0.75rem', fontWeight: 700, flexShrink: 0
+                              }}>
+                                {(u.name || u.email || '?')[0].toUpperCase()}
+                              </div>
+                              {u.name || '—'}
+                            </div>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>{u.email}</td>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                            {u.createdAt?.toDate
+                              ? u.createdAt.toDate().toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+                              : '—'}
+                          </td>
+                          <td>
+                            <span className={`badge ${
+                              u.role === 'admin' ? 'badge-danger' :
+                              u.role === 'treasurer' ? 'badge-warning' :
+                              'badge-info'
+                            }`}>
+                              {u.role || 'user'}
+                            </span>
+                          </td>
+                          <td>
+                            <select
+                              className="form-control"
+                              style={{ width: 'auto', padding: '0.3rem 0.6rem', fontSize: '0.85rem' }}
+                              value={u.role || 'user'}
+                              disabled={updating === u.id}
+                              onChange={e => handleRoleChange(u.id, e.target.value, u.role || 'user')}
+                            >
+                              {ROLES.map(r => (
+                                <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+                              ))}
+                            </select>
+                            {updating === u.id && (
+                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                Saving…
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {(() => {
+                const totalPages = Math.ceil(filtered.length / usersPerPage);
+                if (totalPages <= 1) return null;
+                
+                return (
+                  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                    <button 
+                      className="btn btn-outline"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      ← Previous
+                    </button>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button 
+                      className="btn btn-outline"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                );
+              })()}
+            </>
           )}
         </div>
       </div>

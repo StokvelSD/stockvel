@@ -27,6 +27,7 @@ const UserDashboard = () => {
   const [userGroups, setUserGroups] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [sendingRequest, setSendingRequest] = useState(null);
 
   // Demo data for dashboard
   const [paymentHistory, setPaymentHistory] = useState([
@@ -45,8 +46,6 @@ const UserDashboard = () => {
   useEffect(() => {
     if (showBrowseGroups) {
       fetchAvailableGroups();
-      fetchUserGroups();
-      fetchPendingRequests();
     }
   }, [showBrowseGroups, user]);
 
@@ -78,15 +77,35 @@ const UserDashboard = () => {
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
     try {
+      // First get user's groups
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userGroupsData = userDoc.exists() ? (userDoc.data().groups || []) : [];
+      setUserGroups(userGroupsData); // Update state
+
+      // Get user's pending requests - check for any status to be safe
+      const requestsQuery = query(
+        collection(db, "joinRequests"),
+        where("userId", "==", user.uid)
+      );
+      const requestsSnap = await getDocs(requestsQuery);
+      const allUserRequests = requestsSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      // Filter to pending requests only
+      const pendingRequestsData = allUserRequests.filter(req => req.status === 'pending');
+      setPendingRequests(pendingRequestsData); // Update state
+
+      // Then get all groups
       const groupsSnap = await getDocs(collection(db, "groups"));
       const allGroups = groupsSnap.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      // Filter to only show groups user is NOT a member of
+      // Filter to only show groups user is NOT a member of (like "Other Groups" in browse page)
       const availableGroups = allGroups.filter(
-        (group) => !userGroups.includes(group.id),
+        (group) => !userGroupsData.includes(group.id),
       );
       setGroups(availableGroups);
     } catch (err) {
@@ -214,6 +233,28 @@ const UserDashboard = () => {
       );
     } finally {
       setRequestingGroupId(null);
+    }
+  };
+
+  const handleCancelRequest = async (groupId, groupName) => {
+    setSendingRequest(groupId);
+    try {
+      // Find the pending request for this group
+      const request = pendingRequests.find(r => r.groupId === groupId);
+      if (request) {
+        await updateDoc(doc(db, 'joinRequests', request.id), {
+          status: 'cancelled',
+          cancelledAt: new Date()
+        });
+        setMessage(groupId, 'success', `Request cancelled for ${groupName}`);
+        // Refresh the data
+        await fetchAvailableGroups();
+      }
+    } catch (err) {
+      console.error('Failed to cancel request:', err);
+      setMessage(groupId, 'error', 'Failed to cancel request. Please try again.');
+    } finally {
+      setSendingRequest(null);
     }
   };
 
@@ -449,11 +490,12 @@ const UserDashboard = () => {
                           </button>
                         ) : hasPendingRequest ? (
                           <button
-                            className="btn btn-outline"
+                            className="btn btn-danger"
                             style={{ width: "100%" }}
-                            disabled
+                            onClick={() => handleCancelRequest(group.id, group.groupName || group.name)}
+                            disabled={sendingRequest === group.id}
                           >
-                            Request Pending
+                            {sendingRequest === group.id ? 'Cancelling...' : 'Cancel Request'}
                           </button>
                         ) : isFull ? (
                           <button
