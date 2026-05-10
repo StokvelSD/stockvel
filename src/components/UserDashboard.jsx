@@ -30,14 +30,14 @@ const UserDashboard = () => {
   const [sendingRequest, setSendingRequest] = useState(null);
 
   // Demo data for dashboard
-  const [paymentHistory, setPaymentHistory] = useState([
+  const [paymentHistory] = useState([
     { id: 1, amount: 500, date: "2025-03-05", status: "successful" },
     { id: 2, amount: 500, date: "2025-02-05", status: "successful" },
     { id: 3, amount: 500, date: "2025-01-05", status: "successful" },
     { id: 4, amount: 500, date: "2024-12-05", status: "successful" },
   ]);
 
-  const [upcomingPayments, setUpcomingPayments] = useState([
+  const [upcomingPayments] = useState([
     { id: 1, amount: 500, dueDate: "2025-05-05", status: "pending" },
     { id: 2, amount: 500, dueDate: "2025-06-05", status: "pending" },
     { id: 3, amount: 500, dueDate: "2025-07-05", status: "pending" },
@@ -49,6 +49,7 @@ const UserDashboard = () => {
     }
   }, [showBrowseGroups, user]);
 
+  // ── Fetch unread notification count ──────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const fetchCount = async () => {
@@ -56,17 +57,37 @@ const UserDashboard = () => {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (!userDoc.exists()) return;
         const groupIds = userDoc.data().groups || [];
-        let count = 0;
+
+        // Read already-seen IDs from localStorage
+        const seenRaw = localStorage.getItem(`notif_seen_${user.uid}`);
+        const seenIds = seenRaw ? new Set(JSON.parse(seenRaw)) : new Set();
+
+        let unread = 0;
         for (const groupId of groupIds) {
-          const res = await fetch(
-            `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/announcements`,
-          );
-          if (res.ok) {
-            const data = await res.json();
-            count += data.length;
-          }
+          try {
+            const [annRes, meetRes] = await Promise.all([
+              fetch(
+                `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/announcements`,
+              ),
+              fetch(
+                `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/meetings`,
+              ),
+            ]);
+            if (annRes.ok) {
+              const data = await annRes.json();
+              data.forEach((a) => {
+                if (!seenIds.has(a.id)) unread++;
+              });
+            }
+            if (meetRes.ok) {
+              const data = await meetRes.json();
+              data.forEach((m) => {
+                if (!seenIds.has(m.id)) unread++;
+              });
+            }
+          } catch (_) {}
         }
-        setNotificationCount(count);
+        setNotificationCount(unread);
       } catch (err) {
         console.error("Failed to fetch notification count:", err);
       }
@@ -77,37 +98,26 @@ const UserDashboard = () => {
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
     try {
-      // First get user's groups
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userGroupsData = userDoc.exists() ? (userDoc.data().groups || []) : [];
-      setUserGroups(userGroupsData); // Update state
+      const userGroupsData = userDoc.exists()
+        ? userDoc.data().groups || []
+        : [];
+      setUserGroups(userGroupsData);
 
-      // Get user's pending requests - check for any status to be safe
       const requestsQuery = query(
         collection(db, "joinRequests"),
-        where("userId", "==", user.uid)
+        where("userId", "==", user.uid),
       );
       const requestsSnap = await getDocs(requestsQuery);
-      const allUserRequests = requestsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const allUserRequests = requestsSnap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
       }));
-      // Filter to pending requests only
-      const pendingRequestsData = allUserRequests.filter(req => req.status === 'pending');
-      setPendingRequests(pendingRequestsData); // Update state
+      setPendingRequests(allUserRequests.filter((r) => r.status === "pending"));
 
-      // Then get all groups
       const groupsSnap = await getDocs(collection(db, "groups"));
-      const allGroups = groupsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      // Filter to only show groups user is NOT a member of (like "Other Groups" in browse page)
-      const availableGroups = allGroups.filter(
-        (group) => !userGroupsData.includes(group.id),
-      );
-      setGroups(availableGroups);
+      const allGroups = groupsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setGroups(allGroups.filter((g) => !userGroupsData.includes(g.id)));
     } catch (err) {
       console.error("Failed to fetch groups:", err);
       setMessageMap({ error: { type: "error", text: err.message } });
@@ -118,13 +128,9 @@ const UserDashboard = () => {
 
   const fetchUserGroups = async () => {
     if (!user) return;
-
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        setUserGroups(userData.groups || []);
-      }
+      if (userDoc.exists()) setUserGroups(userDoc.data().groups || []);
     } catch (err) {
       console.error("Failed to fetch user groups:", err);
     }
@@ -132,19 +138,14 @@ const UserDashboard = () => {
 
   const fetchPendingRequests = async () => {
     if (!user) return;
-
     try {
-      const requestsQuery = query(
+      const q = query(
         collection(db, "joinRequests"),
         where("userId", "==", user.uid),
         where("status", "==", "pending"),
       );
-      const requestsSnap = await getDocs(requestsQuery);
-      const requestsData = requestsSnap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPendingRequests(requestsData);
+      const snap = await getDocs(q);
+      setPendingRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error("Failed to fetch pending requests:", err);
     }
@@ -152,20 +153,15 @@ const UserDashboard = () => {
 
   const clearMessage = (groupId) => {
     setMessageMap((prev) => {
-      const updated = { ...prev };
-      delete updated[groupId];
-      return updated;
+      const u = { ...prev };
+      delete u[groupId];
+      return u;
     });
   };
 
   const setMessage = (groupId, type, text) => {
-    setMessageMap((prev) => ({
-      ...prev,
-      [groupId]: { type, text },
-    }));
-    setTimeout(() => {
-      clearMessage(groupId);
-    }, 4000);
+    setMessageMap((prev) => ({ ...prev, [groupId]: { type, text } }));
+    setTimeout(() => clearMessage(groupId), 4000);
   };
 
   const handleJoinRequest = async (groupId, groupName) => {
@@ -173,22 +169,14 @@ const UserDashboard = () => {
       setMessage(groupId, "error", "Please log in to request to join");
       return;
     }
-
     if (requestingGroupId === groupId) return;
     setRequestingGroupId(groupId);
-
     try {
-      // Check if user is already a member
       if (userGroups.includes(groupId)) {
         setMessage(groupId, "error", "You are already a member of this group");
         return;
       }
-
-      // Check if request already pending
-      const alreadyPending = pendingRequests.some(
-        (req) => req.groupId === groupId,
-      );
-      if (alreadyPending) {
+      if (pendingRequests.some((r) => r.groupId === groupId)) {
         setMessage(
           groupId,
           "error",
@@ -196,15 +184,11 @@ const UserDashboard = () => {
         );
         return;
       }
-
-      // Get user data
       const userDoc = await getDoc(doc(db, "users", user.uid));
       const userData = userDoc.exists() ? userDoc.data() : {};
-
-      // Create join request
-      const requestData = {
-        groupId: groupId,
-        groupName: groupName,
+      await addDoc(collection(db, "joinRequests"), {
+        groupId,
+        groupName,
         userId: user.uid,
         userName: userData.name || user.displayName || user.email,
         userSurname: userData.surname || "",
@@ -212,20 +196,14 @@ const UserDashboard = () => {
         userEmail: user.email,
         status: "pending",
         requestedAt: new Date(),
-      };
-
-      await addDoc(collection(db, "joinRequests"), requestData);
-
+      });
       setMessage(
         groupId,
         "success",
         "Join request sent to admin! You'll be notified when approved.",
       );
-
-      // Refresh pending requests
       await fetchPendingRequests();
     } catch (err) {
-      console.error("Failed to send join request:", err);
       setMessage(
         groupId,
         "error",
@@ -239,27 +217,24 @@ const UserDashboard = () => {
   const handleCancelRequest = async (groupId, groupName) => {
     setSendingRequest(groupId);
     try {
-      // Find the pending request for this group
-      const request = pendingRequests.find(r => r.groupId === groupId);
+      const request = pendingRequests.find((r) => r.groupId === groupId);
       if (request) {
-        await updateDoc(doc(db, 'joinRequests', request.id), {
-          status: 'cancelled',
-          cancelledAt: new Date()
+        await updateDoc(doc(db, "joinRequests", request.id), {
+          status: "cancelled",
+          cancelledAt: new Date(),
         });
-        setMessage(groupId, 'success', `Request cancelled for ${groupName}`);
-        // Refresh the data
+        setMessage(groupId, "success", `Request cancelled for ${groupName}`);
         await fetchAvailableGroups();
       }
     } catch (err) {
-      console.error('Failed to cancel request:', err);
-      setMessage(groupId, 'error', 'Failed to cancel request. Please try again.');
+      setMessage(
+        groupId,
+        "error",
+        "Failed to cancel request. Please try again.",
+      );
     } finally {
       setSendingRequest(null);
     }
-  };
-
-  const handleBack = () => {
-    setShowBrowseGroups(false);
   };
 
   const totalPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0);
@@ -269,11 +244,10 @@ const UserDashboard = () => {
     return (
       <div className="dashboard-page">
         <div className="dashboard-inner">
-          {/* Back button */}
           <div style={{ marginBottom: "1.5rem" }}>
             <button
               className="btn btn-outline"
-              onClick={handleBack}
+              onClick={() => setShowBrowseGroups(false)}
               style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
               <svg
@@ -290,7 +264,6 @@ const UserDashboard = () => {
             </button>
           </div>
 
-          {/* Browse Groups Section */}
           <div className="section-card">
             <div
               style={{
@@ -344,7 +317,7 @@ const UserDashboard = () => {
                     (group.maxMembers || Infinity);
                   const isMember = userGroups.includes(group.id);
                   const hasPendingRequest = pendingRequests.some(
-                    (req) => req.groupId === group.id,
+                    (r) => r.groupId === group.id,
                   );
 
                   return (
@@ -363,7 +336,6 @@ const UserDashboard = () => {
                         flexWrap: "wrap",
                       }}
                     >
-                      {/* Group Info */}
                       <div style={{ flex: 2, minWidth: "200px" }}>
                         <div
                           style={{
@@ -439,7 +411,6 @@ const UserDashboard = () => {
                         )}
                       </div>
 
-                      {/* Group Details */}
                       <div
                         style={{
                           flex: 1,
@@ -478,7 +449,6 @@ const UserDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
                       <div style={{ minWidth: "160px" }}>
                         {isMember ? (
                           <button
@@ -492,10 +462,17 @@ const UserDashboard = () => {
                           <button
                             className="btn btn-danger"
                             style={{ width: "100%" }}
-                            onClick={() => handleCancelRequest(group.id, group.groupName || group.name)}
+                            onClick={() =>
+                              handleCancelRequest(
+                                group.id,
+                                group.groupName || group.name,
+                              )
+                            }
                             disabled={sendingRequest === group.id}
                           >
-                            {sendingRequest === group.id ? 'Cancelling...' : 'Cancel Request'}
+                            {sendingRequest === group.id
+                              ? "Cancelling..."
+                              : "Cancel Request"}
                           </button>
                         ) : isFull ? (
                           <button
@@ -537,7 +514,6 @@ const UserDashboard = () => {
   return (
     <div className="dashboard-page">
       <div className="dashboard-inner">
-        {/* Header */}
         <div className="dashboard-header">
           <h2>My Dashboard</h2>
           <p>Track your stokvel savings and upcoming contributions.</p>
@@ -545,7 +521,6 @@ const UserDashboard = () => {
 
         <SavingsProjection userBalance={totalPaid || 5000} />
 
-        {/* Browse Groups Button */}
         {/* Buttons row */}
         <div
           style={{
@@ -555,7 +530,7 @@ const UserDashboard = () => {
             marginBottom: "1.5rem",
           }}
         >
-          {/* Browse Groups Button */}
+          {/* Browse Groups */}
           <button
             className="btn btn-primary"
             onClick={() => setShowBrowseGroups(true)}
@@ -577,7 +552,7 @@ const UserDashboard = () => {
             Browse Available Groups
           </button>
 
-          {/* Notification Bell Button */}
+          {/* ── Notification bell — fixed badge ── */}
           <div style={{ position: "relative", display: "inline-block" }}>
             <button
               className="btn btn-primary"
@@ -598,50 +573,31 @@ const UserDashboard = () => {
               Notifications
             </button>
 
-            {/* Red badge — hardcoded to 0 for now, will update once feed is fetched */}
-            <span
-              style={{
-                position: "absolute",
-                top: "-6px",
-                right: "-6px",
-                background: "#dc2626",
-                color: "#fff",
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                minWidth: "18px",
-                height: "18px",
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                border: "2px solid var(--bg)",
-                padding: "0 3px",
-              }}
-            >
-              {notificationCount > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-6px",
-                    right: "-6px",
-                    background: "#dc2626",
-                    color: "#fff",
-                    fontSize: "0.65rem",
-                    fontWeight: 700,
-                    minWidth: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid var(--bg)",
-                    padding: "0 3px",
-                  }}
-                >
-                  {notificationCount}
-                </span>
-              )}
-            </span>
+            {/* Only render the badge when there is something to show */}
+            {notificationCount > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-6px",
+                  right: "-6px",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  minWidth: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "2px solid var(--bg)",
+                  padding: "0 3px",
+                  pointerEvents: "none",
+                }}
+              >
+                {notificationCount > 99 ? "99+" : notificationCount}
+              </span>
+            )}
           </div>
         </div>
 
@@ -668,7 +624,7 @@ const UserDashboard = () => {
           </div>
         </div>
 
-        {/* My Groups Section */}
+        {/* My Groups */}
         <div className="section-card" style={{ marginBottom: "2rem" }}>
           <h3>📋 My Groups</h3>
           <MyGroups />
