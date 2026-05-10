@@ -7,10 +7,25 @@ const express = require('express');
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 const mockAdd = jest.fn().mockResolvedValue({ id: 'payment-123' });
+const mockGet = jest.fn().mockResolvedValue({
+    exists: true,
+    data: () => ({ currentCycle: 2 })
+});
 
-jest.mock('../firebase/admin', () => ({
-    collection: jest.fn().mockReturnValue({ add: mockAdd }),
-}));
+const mockDoc = jest.fn().mockReturnValue({
+    get: mockGet
+});
+
+const mockCollection = jest.fn().mockReturnValue({
+    doc: mockDoc,
+    add: mockAdd
+});
+
+const mockDb = {
+    collection: mockCollection
+};
+
+jest.mock('../firebase/admin', () => mockDb);
 
 jest.mock('firebase-admin', () => ({
     firestore: {
