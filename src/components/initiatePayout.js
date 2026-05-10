@@ -9,35 +9,15 @@ import {
   serverTimestamp,
   getDoc,
 } from "firebase/firestore";
-import { db } from "../firebase/firebase"; 
+import { db } from "../firebase/firebase";
 
 const PAYSTACK_SECRET = "sk_test_adc15a664a72600a8e6f56b95cc04f43368d7c72";
-const PAYSTACK_BASE   = "https://api.paystack.co";
-
-async function resolveAccount(accountNumber, bankCode) {
-  if (PAYSTACK_SECRET.startsWith("sk_test_")) {
-    return {
-      account_number: accountNumber,
-      account_name: "Test Account",
-    };
-  }
-
-  const res = await fetch(
-    `${PAYSTACK_BASE}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`,
-    { headers: { Authorization: `Bearer ${PAYSTACK_SECRET}` } }
-  );
-
-  const data = await res.json();
-  if (!data.status) throw new Error(`Account resolution failed: ${data.message}`);
-  return data.data;
-}
+const PAYSTACK_BASE = "https://api.paystack.co";
 
 async function createTransferRecipient(bankDetails) {
   if (PAYSTACK_SECRET.startsWith("sk_test_")) {
-    return "RCP_test_mock";
+    return "RCP_twenzmvne0bg3b8";
   }
-
-  const resolved = await resolveAccount(bankDetails.accountNumber, bankDetails.bankCode);
 
   const res = await fetch(`${PAYSTACK_BASE}/transferrecipient`, {
     method: "POST",
@@ -47,10 +27,10 @@ async function createTransferRecipient(bankDetails) {
     },
     body: JSON.stringify({
       type: "nuban",
-      name: resolved.account_name,
-      account_number: resolved.account_number,
+      name: bankDetails.accountName,
+      account_number: bankDetails.accountNumber,
       bank_code: bankDetails.bankCode,
-      currency: "ZAR", 
+      currency: "ZAR",
     }),
   });
 
@@ -63,7 +43,6 @@ async function paystackTransfer({ recipientCode, amountZAR, payoutId }) {
   if (PAYSTACK_SECRET.startsWith("sk_test_")) {
     return {
       reference: `TEST_REF_${Date.now()}`,
-      newBalance: 0,
     };
   }
 
@@ -75,7 +54,7 @@ async function paystackTransfer({ recipientCode, amountZAR, payoutId }) {
     },
     body: JSON.stringify({
       source: "balance",
-      amount: amountZAR * 100, 
+      amount: amountZAR * 100,
       recipient: recipientCode,
       reason: `Stokvel payout - ${payoutId}`,
     }),
@@ -83,29 +62,23 @@ async function paystackTransfer({ recipientCode, amountZAR, payoutId }) {
 
   const data = await res.json();
   if (!data.status) throw new Error(data.message || "Paystack transfer failed");
-
-  return { reference: data.data.reference, newBalance: 0 };
+  return { reference: data.data.reference };
 }
 
-export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) => {
+export const initiatePayout = async ({ groupId, amount }) => {
   if (!amount || amount <= 0) {
     throw new Error("Invalid payout amount");
   }
 
   const groupDoc = await getDoc(doc(db, "groups", groupId));
   if (!groupDoc.exists()) throw new Error("Group not found");
-  
+
   const groupData = groupDoc.data();
-  const memberIds = groupData.members || [];
-  if (memberIds.length === 0) throw new Error("No members in this group");
+  const payoutOrder = groupData.payoutOrder || [];
+  const currentCycle = groupData.currentCycle || 1;
 
-  const userDocs = await Promise.all(memberIds.map(id => getDoc(doc(db, "users", id))));
-  const users = userDocs
-    .filter(d => d.exists())
-    .map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (a.name || "").localeCompare(b.name || "")); 
+  if (payoutOrder.length === 0) throw new Error("No payout order set for this group");
 
-  // FIXED: Single query to prevent Firebase Missing Index errors
   const payoutsSnap = await getDocs(
     query(
       collection(db, "payouts"),
@@ -113,21 +86,24 @@ export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) =>
     )
   );
 
-  // FIXED: Filter the cycle and success status in memory
   const paidMemberIds = payoutsSnap.docs
     .map(d => d.data())
-    .filter(p => p.cycleId === currentCycleId && p.status === "success")
+    .filter(p => p.cycleId === currentCycle && p.status === "success")
     .map(p => p.userId);
 
-  const nextMember = users.find(m => !paidMemberIds.includes(m.id));
-  if (!nextMember) throw new Error("All members already paid this cycle");
+  const nextMemberId = payoutOrder.find(uid => !paidMemberIds.includes(uid));
+  if (!nextMemberId) throw new Error("All members have been paid out this cycle");
+
+  const nextMemberDoc = await getDoc(doc(db, "users", nextMemberId));
+  if (!nextMemberDoc.exists()) throw new Error("Next member user record not found");
+  const nextMember = { id: nextMemberDoc.id, ...nextMemberDoc.data() };
 
   const payoutRef = await addDoc(collection(db, "payouts"), {
     groupId,
     userId: nextMember.id,
     userName: nextMember.name || nextMember.email,
     amount,
-    cycleId: currentCycleId,
+    cycleId: currentCycle,
     status: "pending",
     createdAt: serverTimestamp(),
   });
@@ -139,17 +115,9 @@ export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) =>
     )
   );
 
-  let bankDetails;
-  
-  if (bankSnap.empty) {
-    bankDetails = {
-      accountName: nextMember.name || nextMember.email,
-      accountNumber: "0000000000",
-      bankCode: "000"
-    };
-  } else {
-    bankDetails = bankSnap.docs[0].data();
-  }
+  const bankDetails = bankSnap.empty
+    ? { accountName: nextMember.name || nextMember.email, accountNumber: "0000000000", bankCode: "000" }
+    : bankSnap.docs[0].data();
 
   let recipientCode;
   try {
@@ -178,5 +146,15 @@ export const initiatePayout = async ({ groupId, amount, currentCycleId = 1 }) =>
     reference,
   });
 
-  return true;
+  const newPaidCount = paidMemberIds.length + 1;
+  const isLastMember = newPaidCount === payoutOrder.length;
+
+  if (isLastMember) {
+    await updateDoc(doc(db, "groups", groupId), {
+      currentCycle: currentCycle + 1,
+      cycleStartDate: serverTimestamp(),
+    });
+  }
+
+  return { success: true, cycleAdvanced: isLastMember, newCycle: isLastMember ? currentCycle + 1 : currentCycle };
 };
