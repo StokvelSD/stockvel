@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayRemove, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayRemove, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { PaystackButton, usePaystackPayment } from 'react-paystack';
 
 function GroupDetails() {
@@ -265,8 +265,27 @@ function GroupDetails() {
     }
   };
 
-  const handlePaystackSuccessAction = () => {
-    alert("Payment successful! Waiting for the server to confirm your transaction.");
+  const handlePaystackSuccessAction = async () => {
+    try {
+      const groupDoc = await getDoc(doc(db, 'groups', id));
+      const currentCycle = groupDoc.data()?.currentCycle || 1;
+      await addDoc(collection(db, 'payments'), {
+        userId: user?.uid,
+        groupId: id,
+        groupName: group?.groupName || group?.name,
+        userName: user?.displayName || user?.email,
+        amount: group?.contributionAmount,
+        status: 'paid',
+        cycleId: currentCycle,
+        reference: Date.now().toString(),
+        createdAt: serverTimestamp(),
+      });
+      alert("Payment successful!");
+      fetchGroupDetails();
+    } catch (err) {
+      console.error('Failed to record payment:', err);
+      alert("Payment went through but failed to record. Contact your treasurer.");
+    }
   };
 
   const handlePaystackCloseAction = () => {
