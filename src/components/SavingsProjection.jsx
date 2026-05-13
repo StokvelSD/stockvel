@@ -96,6 +96,8 @@ const SavingsProjection = ({ userBalance = 5000 }) => {
                                 <option value={12}>1 year</option>
                                 <option value={24}>2 years</option>
                                 <option value={36}>3 years</option>
+                                <option value={60}>5 years</option>
+                                <option value={120}>10 years</option>
 
                             </select>
                         </form>
