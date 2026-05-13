@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchSarbRates } from "../services/sarbRates";
 
-const SavingsProjection = ({ userBalance = 5000 }) => {
+const SavingsProjection = ({ userBalance = 0 }) => {
     const [rates, setRates] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
