@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import MyGroups from "../components/MyGroups";
 import SavingsProjection from "./SavingsProjection";
+import { fetchTotalPaid, fetchContributionsByGroup } from "../services/contributions";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -29,19 +30,14 @@ const UserDashboard = () => {
   const [notificationCount, setNotificationCount] = useState(0);
   const [sendingRequest, setSendingRequest] = useState(null);
 
-  // Demo data for dashboard
-  const [paymentHistory] = useState([
-    { id: 1, amount: 500, date: "2025-03-05", status: "successful" },
-    { id: 2, amount: 500, date: "2025-02-05", status: "successful" },
-    { id: 3, amount: 500, date: "2025-01-05", status: "successful" },
-    { id: 4, amount: 500, date: "2024-12-05", status: "successful" },
-  ]);
+  const[totalPaid, setTotalPaid] = useState(0);
+  const[contributionCount, setContributionCount] = useState(0);
+  const[groupContributions, setGroupContributions] = useState([]);
+  const[loadingRealData, setLoadingRealData] = useState(true);
 
-  const [upcomingPayments] = useState([
-    { id: 1, amount: 500, dueDate: "2025-05-05", status: "pending" },
-    { id: 2, amount: 500, dueDate: "2025-06-05", status: "pending" },
-    { id: 3, amount: 500, dueDate: "2025-07-05", status: "pending" },
-  ]);
+  const[upcomingPayments, setUpComingPayments] = useState([]);
+  const[paymentHistory, setPaymentHistory] = useState([]);
+
 
   useEffect(() => {
     if (showBrowseGroups) {
@@ -94,6 +90,47 @@ const UserDashboard = () => {
     };
     fetchCount();
   }, [user]);
+
+  useEffect(() => {
+    const loadUserGroups = async () => {
+      if (!user) return;
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setUserGroups(userDoc.data().groups || []);
+        }
+      } catch (err) {
+        console.error("Failed to load user groups:", err);
+      }
+    };
+    loadUserGroups();
+  }, [user]);
+
+
+  useEffect(() => {
+    const loadRealContributionData = async () => {
+      if(!user)return;
+      setLoadingRealData(true);
+
+      try{
+        const {total, count, contributions} = await fetchTotalPaid();
+        setTotalPaid(total);
+        setContributionCount(count);
+        setPaymentHistory(contributions);
+
+        const byGroup = await fetchContributionsByGroup();
+        setGroupContributions(byGroup);
+
+        setUpComingPayments([]);
+      }catch(error){
+        console.error("Error loading contribution data", error);
+      }finally{
+        setLoadingRealData(false);
+      }
+    };
+    loadRealContributionData();
+  }, [user]);
+
 
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
@@ -237,8 +274,8 @@ const UserDashboard = () => {
     }
   };
 
-  const totalPaid = paymentHistory.reduce((sum, p) => sum + p.amount, 0);
-  const nextPayment = upcomingPayments[0]?.dueDate || "No upcoming payments";
+  const nextPaymentDate = upcomingPayments[0]?.dueDate || "No upcoming payments";
+  const nextPaymentAmount = upcomingPayments[0]?.amount|| 0;
 
   if (showBrowseGroups) {
     return (
@@ -519,7 +556,7 @@ const UserDashboard = () => {
           <p>Track your stokvel savings and upcoming contributions.</p>
         </div>
 
-        <SavingsProjection userBalance={totalPaid || 5000} />
+        <SavingsProjection userBalance={totalPaid} />
 
         {/* Buttons row */}
         <div
@@ -605,21 +642,19 @@ const UserDashboard = () => {
         <div className="stats-grid" style={{ marginBottom: "2rem" }}>
           <div className="stat-card accent-green">
             <div className="stat-label">Total Paid</div>
-            <div className="stat-value">R{totalPaid}</div>
-            <div className="stat-sub">since joining</div>
+            <div className="stat-value">{loadingRealData ? "Loading..." : `R${totalPaid.toLocaleString()}`}</div>
+            <div className="stat-sub">{contributionCount} {contributionCount === 1 ? "payment" : "payments"}</div>
           </div>
           <div className="stat-card accent-blue">
             <div className="stat-label">Next Payment</div>
             <div className="stat-value">
-              {new Date(nextPayment).toLocaleDateString()}
-            </div>
-            <div className="stat-sub">
-              amount: R{upcomingPayments[0]?.amount}
+              {nextPaymentDate !== "No upcoming payments" ? `amount: R${nextPaymentAmount}` : "No scheduled payments"}
             </div>
           </div>
+
           <div className="stat-card accent-warn">
             <div className="stat-label">My Groups</div>
-            <div className="stat-value">{3}</div>
+            <div className="stat-value">{loadingRealData ? "..." : userGroups.length}</div>
             <div className="stat-sub">active memberships</div>
           </div>
         </div>
@@ -664,15 +699,19 @@ const UserDashboard = () => {
         {/* Payment history */}
         <div className="section-card">
           <h3>📜 Payment History</h3>
-          {paymentHistory.length === 0 ? (
-            <p>No payments yet. Make your first contribution!</p>
+          {loadingRealData ? (
+              <p>Loading payment history...</p>
+          ) : paymentHistory.length === 0 ? (
+            <p>No payments yet. Join a group and make your first contributions!</p>
           ) : (
+            
             <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
                     <th>Date</th>
                     <th>Amount</th>
+                    <th>Group</th>
                     <th>Status</th>
                   </tr>
                 </thead>
@@ -680,10 +719,11 @@ const UserDashboard = () => {
                   {paymentHistory.map((p) => (
                     <tr key={p.id}>
                       <td>{new Date(p.date).toLocaleDateString()}</td>
-                      <td>R{p.amount}</td>
+                      <td>R{p.amount.toLocaleString}</td>
+                      <td>{p.groupName || "Unknown Group"}</td>
                       <td>
                         <span className="badge badge-success">
-                          ✓ {p.status}
+                          ✓ {p.status || "paid"}
                         </span>
                       </td>
                     </tr>
