@@ -83,6 +83,14 @@ const Navbar = () => {
               </Link>
             )}
 
+            { isAdmin && (
+              <Link to="/reports" className="nav-link" onClick={() => setIsOpen(false)}>
+                My Reports
+              </Link>
+            )
+
+            }
+
             {/* Browse Groups - visible to all logged in users */}
             <Link to="/browse-groups" className="nav-link" onClick={() => setIsOpen(false)}>
               Browse Groups

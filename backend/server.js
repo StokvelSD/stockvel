@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
 
-
 const serviceAccount = require("./serviceAccountKey.json");
 
 admin.initializeApp({
@@ -17,7 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
-   🔐 MIDDLEWARE (PUT HERE)
+   🔐 MIDDLEWARE
 ========================= */
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -30,7 +29,7 @@ const verifyToken = async (req, res, next) => {
 
   try {
     const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken; // attach user to request
+    req.user = decodedToken;
     next();
   } catch (err) {
     return res.status(401).json({ error: "Invalid token" });
@@ -38,26 +37,31 @@ const verifyToken = async (req, res, next) => {
 };
 
 /* =========================
-   📊 ROUTES (PUT BELOW)
+   📊 ROUTES
 ========================= */
 
 app.get("/contributions/paid", verifyToken, async (req, res) => {
   try {
     const userId = req.user.uid;
+    const { groupId } = req.query; // ✅ get groupId from frontend
+
+    if (!groupId) {
+      return res.status(400).json({ error: "groupId is required" });
+    }
 
     const snapshot = await db
-      .collection("contributions")
+      .collection("payments")
+      .where("groupId", "==", groupId)
       .where("userId", "==", userId)
       .where("status", "==", "paid")
       .get();
 
     const data = snapshot.docs.map(doc => {
       const d = doc.data();
-
       return {
         id: doc.id,
         ...d,
-        date: d.date.toDate().toLocaleDateString()
+        date: d.createdAt?.toDate?.() || null
       };
     });
 

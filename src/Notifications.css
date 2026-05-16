@@ -17,11 +17,47 @@
   font-size: 1.5rem;
   color: var(--text);
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .notif-back-btn {
   padding: 0.35rem 0.9rem;
   font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+/* Unread count badge next to page title */
+.notif-page-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  padding: 0 5px;
+  letter-spacing: 0;
+}
+
+/* Refresh button */
+.notif-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ===== SECTION CARD ===== */
@@ -90,11 +126,30 @@
   min-width: 0;
 }
 
+/* name row holds name + unread pill */
+.group-list-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .group-list-name {
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text);
   transition: var(--transition);
+}
+
+/* "3 new" pill on group row */
+.group-unread-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: #dc2626;
+  color: #fff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  letter-spacing: 0.03em;
 }
 
 .group-list-sub {
@@ -121,7 +176,6 @@
   background: #fef3c7;
   color: #92400e;
 }
-
 .badge-meet {
   background: var(--blue-pale);
   color: var(--blue-dark);
@@ -155,10 +209,22 @@
 .feed-item--clickable {
   cursor: pointer;
 }
-
 .feed-item--clickable:hover {
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
+}
+
+/* Unread items get a slightly stronger border */
+.feed-item--unread {
+  border-color: currentColor;
+  opacity: 1;
+}
+
+/* Title row â€” holds unread dot + title text */
+.feed-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* ===== ANNOUNCEMENT ITEM ===== */
@@ -167,9 +233,11 @@
   border-left: 4px solid #f59e0b;
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
 }
-
 .feed-item.announcement .feed-item-title {
   color: #92400e;
+}
+.feed-item.announcement.feed-item--unread {
+  border-left-color: #d97706;
 }
 
 /* ===== MEETING ITEM ===== */
@@ -178,9 +246,11 @@
   border-left: 4px solid var(--blue);
   border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
 }
-
 .feed-item.meeting .feed-item-title {
   color: var(--blue-dark);
+}
+.feed-item.meeting.feed-item--unread {
+  border-left-color: var(--blue-dark);
 }
 
 /* ===== FEED ITEM CONTENT ===== */
@@ -196,7 +266,6 @@
   line-height: 1.5;
 }
 
-/* truncate long messages in the list view */
 .feed-item-message--clamp {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -204,7 +273,7 @@
   overflow: hidden;
 }
 
-/* ===== FOOTER ROW (date + "View â†’") ===== */
+/* ===== FOOTER ROW ===== */
 .feed-item-footer-row {
   display: flex;
   align-items: center;
@@ -220,7 +289,6 @@
   text-transform: uppercase;
   flex-shrink: 0;
 }
-
 .feed-item.announcement .feed-item-read-more {
   color: #b45309;
 }
@@ -258,12 +326,10 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-
 .meeting-status-badge.status-upcoming {
   background: #d1fae5;
   color: #065f46;
 }
-
 .meeting-status-badge.status-past {
   background: #e5e7eb;
   color: #4b5563;
@@ -278,7 +344,7 @@
   letter-spacing: 0.06em;
 }
 
-/* ===== EMPTY & LOADING STATES ===== */
+/* ===== EMPTY & LOADING ===== */
 .feed-empty {
   padding: 2rem 0;
   text-align: center;
@@ -293,20 +359,7 @@
   text-align: center;
 }
 
-/* ===== GROUP LABEL (legacy) ===== */
-.feed-item-group {
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--blue);
-  margin-bottom: 4px;
-}
-
-/* =====================================================================
-   DETAIL CARD  (announcement & meeting)
-   ===================================================================== */
-
+/* ===== DETAIL CARD ===== */
 .detail-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -316,16 +369,13 @@
   margin-bottom: 1.5rem;
 }
 
-/* coloured top band */
 .detail-band {
   height: 6px;
   width: 100%;
 }
-
 .detail-band--announcement {
   background: linear-gradient(90deg, #f59e0b, #fbbf24);
 }
-
 .detail-band--meeting {
   background: linear-gradient(90deg, var(--blue), #60a5fa);
 }
@@ -337,7 +387,6 @@
   gap: 0.75rem;
 }
 
-/* group pill */
 .detail-group-pill {
   display: inline-block;
   font-size: 0.7rem;
@@ -350,13 +399,11 @@
   border-radius: 999px;
   align-self: flex-start;
 }
-
 .detail-card--announcement .detail-group-pill {
   color: #92400e;
   background: #fef3c7;
 }
 
-/* top row (pill + status badge side by side) */
 .detail-top-row {
   display: flex;
   align-items: center;
@@ -364,7 +411,6 @@
   flex-wrap: wrap;
 }
 
-/* main title */
 .detail-title {
   font-size: 1.35rem;
   font-weight: 700;
@@ -373,7 +419,6 @@
   margin: 0;
 }
 
-/* meta row (icon + text, used for announcement date) */
 .detail-meta-row {
   display: flex;
   align-items: center;
@@ -386,19 +431,16 @@
   font-size: 0.95rem;
   flex-shrink: 0;
 }
-
 .detail-meta-text {
   line-height: 1.4;
 }
 
-/* divider */
 .detail-divider {
   border: none;
   border-top: 1px solid var(--border);
   margin: 0.5rem 0;
 }
 
-/* main message / body text */
 .detail-message {
   font-size: 0.95rem;
   color: var(--text);
@@ -407,7 +449,6 @@
   margin: 0;
 }
 
-/* â”€â”€ Meeting info grid â”€â”€ */
 .detail-info-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -420,7 +461,6 @@
   flex-direction: column;
   gap: 0.3rem;
 }
-
 .detail-info-block--full {
   grid-column: 1 / -1;
 }
@@ -440,10 +480,158 @@
   line-height: 1.4;
 }
 
-/* agenda block */
 .detail-agenda {
   display: flex;
   flex-direction: column;
+}
+
+/* =====================================================================
+   HISTORY SECTION  (configure page)
+   ===================================================================== */
+
+.history-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.history-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1.5px solid #e0dfd9;
+  border-radius: 8px;
+  background: #fafaf9;
+  color: #777;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.history-tab:hover {
+  background: #f0efeb;
+}
+
+.history-tab--active {
+  background: #1a7f54;
+  border-color: #1a7f54;
+  color: #fff;
+}
+
+.history-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0 4px;
+  background: rgba(0, 0, 0, 0.12);
+  color: inherit;
+}
+
+.history-tab--active .history-tab-count {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.history-empty {
+  text-align: center;
+  color: #999;
+  font-size: 0.875rem;
+  padding: 1.5rem 0;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.history-item {
+  border: 1px solid #e0dfd9;
+  border-radius: 10px;
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: #fafaf9;
+}
+
+.history-item--ann {
+  border-left: 3px solid #f59e0b;
+}
+.history-item--meet {
+  border-left: 3px solid #3b82f6;
+}
+
+.history-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.history-item-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.history-item-date {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.history-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.history-status-badge.status-upcoming {
+  background: #d1fae5;
+  color: #065f46;
+}
+.history-status-badge.status-past {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+
+.history-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.history-meta-chip {
+  font-size: 0.75rem;
+  color: #666;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+}
+
+.history-item-body {
+  font-size: 0.85rem;
+  color: #555;
+  line-height: 1.5;
+  margin: 0;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -451,33 +639,32 @@
   .notifications-page {
     padding: 1.5rem 1rem;
   }
-
   .section-card {
     padding: 1.1rem;
   }
-
   .feed-item {
     padding: 0.85rem 1rem;
   }
-
   .group-list-badges {
     flex-direction: column;
     gap: 0.25rem;
   }
-
   .detail-body {
     padding: 1.25rem;
   }
-
   .detail-info-grid {
     grid-template-columns: 1fr;
   }
-
   .detail-info-block--full {
     grid-column: 1;
   }
-
   .detail-title {
     font-size: 1.15rem;
+  }
+  .history-tabs {
+    flex-direction: column;
+  }
+  .history-tab {
+    justify-content: center;
   }
 }
