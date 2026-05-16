@@ -9,7 +9,6 @@ import {
   getDoc,
   addDoc,
   updateDoc,
-  arrayUnion,
   query,
   where,
 } from "firebase/firestore";
@@ -17,7 +16,7 @@ import MyGroups from "../components/MyGroups";
 import SavingsProjection from "./SavingsProjection";
 
 const UserDashboard = () => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
@@ -26,6 +25,8 @@ const UserDashboard = () => {
   const [showBrowseGroups, setShowBrowseGroups] = useState(false);
   const [userGroups, setUserGroups] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [adminRoleRequestPending, setAdminRoleRequestPending] = useState(false);
+  const [adminRequestSending, setAdminRequestSending] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [sendingRequest, setSendingRequest] = useState(null);
 
@@ -51,6 +52,7 @@ const UserDashboard = () => {
 
   useEffect(() => {
     if (!user) return;
+    fetchAdminRoleRequestStatus();
     const fetchCount = async () => {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -150,6 +152,22 @@ const UserDashboard = () => {
     }
   };
 
+  const fetchAdminRoleRequestStatus = async () => {
+    if (!user) return;
+
+    try {
+      const roleQuery = query(
+        collection(db, "roleRequests"),
+        where("userId", "==", user.uid),
+        where("status", "==", "pending"),
+      );
+      const roleSnap = await getDocs(roleQuery);
+      setAdminRoleRequestPending(roleSnap.docs.length > 0);
+    } catch (err) {
+      console.error("Failed to fetch admin role request status:", err);
+    }
+  };
+
   const clearMessage = (groupId) => {
     setMessageMap((prev) => {
       const updated = { ...prev };
@@ -210,6 +228,7 @@ const UserDashboard = () => {
         userSurname: userData.surname || "",
         userFullName: `${userData.name || ""} ${userData.surname || ""}`.trim(),
         userEmail: user.email,
+        userRole: userData.role || 'user',
         status: "pending",
         requestedAt: new Date(),
       };
@@ -255,6 +274,33 @@ const UserDashboard = () => {
       setMessage(groupId, 'error', 'Failed to cancel request. Please try again.');
     } finally {
       setSendingRequest(null);
+    }
+  };
+
+  const handleAdminRoleRequest = async () => {
+    if (!user || role === 'admin') return;
+    if (adminRequestSending || adminRoleRequestPending) return;
+
+    setAdminRequestSending(true);
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+
+      await addDoc(collection(db, 'roleRequests'), {
+        userId: user.uid,
+        userName: userData.name || user.displayName || user.email,
+        userEmail: user.email,
+        requestedAt: new Date(),
+        status: 'pending',
+      });
+
+      setAdminRoleRequestPending(true);
+      setMessage('adminRole', 'success', 'Admin role request sent. An admin will review it soon.');
+    } catch (err) {
+      console.error('Failed to send admin role request:', err);
+      setMessage('adminRole', 'error', 'Failed to send admin role request. Please try again.');
+    } finally {
+      setAdminRequestSending(false);
     }
   };
 
@@ -577,6 +623,21 @@ const UserDashboard = () => {
             Browse Available Groups
           </button>
 
+          {role !== 'admin' && (
+            <button
+              className={adminRoleRequestPending ? "btn btn-danger" : "btn btn-outline"}
+              onClick={handleAdminRoleRequest}
+              disabled={adminRoleRequestPending || adminRequestSending}
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
+            >
+              {adminRoleRequestPending
+                ? "Admin request pending"
+                : adminRequestSending
+                ? "Sending..."
+                : "Request Admin Role"}
+            </button>
+          )}
+
           {/* Notification Bell Button */}
           <div style={{ position: "relative", display: "inline-block" }}>
             <button
@@ -644,6 +705,20 @@ const UserDashboard = () => {
             </span>
           </div>
         </div>
+
+        {messageMap.adminRole && (
+          <div
+            style={{
+              marginBottom: "1rem",
+              padding: "1rem",
+              borderRadius: "12px",
+              background: messageMap.adminRole.type === "success" ? "#d1fae5" : "#fee2e2",
+              color: messageMap.adminRole.type === "success" ? "#065f46" : "#991b1b",
+            }}
+          >
+            {messageMap.adminRole.text}
+          </div>
+        )}
 
         {/* Stats cards */}
         <div className="stats-grid" style={{ marginBottom: "2rem" }}>

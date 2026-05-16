@@ -7,7 +7,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/firebase';
 
 const AuthContext = createContext();
@@ -19,19 +19,31 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeUserDoc = null;
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const docSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-        const userRole = docSnap.exists() ? docSnap.data().role : 'user';
-        setRole(userRole);
         setUser(firebaseUser);
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        unsubscribeUserDoc = onSnapshot(userRef, (snap) => {
+          setRole(snap.exists() ? snap.data().role || 'user' : 'user');
+        });
       } else {
         setUser(null);
         setRole(null);
+        if (unsubscribeUserDoc) {
+          unsubscribeUserDoc();
+          unsubscribeUserDoc = null;
+        }
       }
       setLoading(false);
     });
-    return unsub;
+
+    return () => {
+      unsub();
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+      }
+    };
   }, []);
 
   const login = async (email, password) => {

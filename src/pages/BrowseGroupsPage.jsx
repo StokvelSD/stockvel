@@ -416,6 +416,7 @@ function BrowseGroupsPage() {
         userId: user.uid,
         userName: userData.name || user.email,
         userEmail: user.email,
+        userRole: userData.role || 'user',
         groupId: group.id,
         groupName: group.groupName || group.name,
         status: 'pending',
@@ -657,8 +658,18 @@ function BrowseGroupsPage() {
                     padding: '1rem',
                     background: 'white'
                   }}>
-                    <p><strong>{request.userName}</strong> ({request.userEmail})</p>
-                    <p>Wants to join: <strong>{request.groupName}</strong></p>
+                    <p>
+                      <strong>{request.userName}</strong>
+                      {' '}
+                      <span className={`badge ${
+                        request.userRole === 'admin' ? 'badge-danger' :
+                        request.userRole === 'treasurer' ? 'badge-warning' :
+                        'badge-info'
+                      }`}>
+                        {request.userRole || 'user'}
+                      </span>
+                    </p>
+                    <p>{request.userEmail} wants to join: <strong>{request.groupName}</strong></p>
                     <p><small>Requested: {request.requestedAt?.toDate().toLocaleString()}</small></p>
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
                       <button

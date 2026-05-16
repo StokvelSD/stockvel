@@ -160,8 +160,17 @@ function AdminPage() {
           {joinRequests.map((request) => (
             <div key={request.id}>
               <p>
-                {request.userName} → {request.groupName}
+                <strong>{request.userName}</strong>
+                {' '}
+                <span className={`badge ${
+                  request.userRole === 'admin' ? 'badge-danger' :
+                  request.userRole === 'treasurer' ? 'badge-warning' :
+                  'badge-info'
+                }`}>
+                  {request.userRole || 'user'}
+                </span>
               </p>
+              <p>{request.userEmail} → {request.groupName}</p>
 
               <button
                 onClick={async () => {

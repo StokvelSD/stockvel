@@ -54,41 +54,62 @@ a:hover { text-decoration: underline; }
 }
 
 /* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.6rem 1.4rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  border: none;
+  line-height: 1;
+}
+
 .btn-primary {
   background: var(--blue);
   color: #fff;
-  border: none;
-  padding: 0.6rem 1.4rem;
-  border-radius: var(--radius);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: var(--transition);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  text-decoration: none;
-  font-family: inherit;
 }
 .btn-primary:hover { background: var(--blue-dark); transform: translateY(-1px); box-shadow: var(--shadow); text-decoration: none; }
+
+.btn-success {
+  background: var(--success);
+  color: #fff;
+}
+.btn-success:hover { background: #15803d; transform: translateY(-1px); box-shadow: var(--shadow); }
 
 .btn-secondary {
   background: transparent;
   border: 1.5px solid var(--blue);
   color: var(--blue);
-  padding: 0.6rem 1.4rem;
-  border-radius: var(--radius);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: var(--transition);
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  text-decoration: none;
-  font-family: inherit;
 }
 .btn-secondary:hover { background: var(--blue); color: #fff; text-decoration: none; }
+
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--blue);
+  color: var(--blue);
+}
+
+.btn-outline:hover {
+  background: var(--blue);
+  color: #fff;
+  text-decoration: none;
+}
+
+.btn-outline:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-outline .badge {
+  margin-left: 0.4rem;
+}
 
 .btn-ghost {
   background: transparent;
