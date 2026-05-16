@@ -16,7 +16,7 @@ import UserDashboard from "./components/UserDashboard";
 import Dashboard from "./pages/Dashboard.jsx";
 import AdminPage from "./pages/AdminPage";
 import Notifications from "./components/Notifications.jsx";
-
+import AdminReportsPage from "./pages/AdminReportsPage.jsx";
 
 import CreateGroupPage from "./pages/CreateGroupPage";
 import BrowseGroupsPage from "./pages/BrowseGroupsPage";
@@ -67,6 +67,15 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["user", "treasurer", "admin"]}>
                 <UserDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+           <Route
+            path="/reports"
+            element={
+              <ProtectedRoute allowedRoles={["user", "treasurer", "admin"]}>
+                <AdminReportsPage />
               </ProtectedRoute>
             }
           />

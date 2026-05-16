@@ -1,4 +1,4 @@
-const { db } = require("../firebase/admin");
+const db = require("../firebase/admin");
 
 async function getPaidContributions(req, res) {
   try {
@@ -67,7 +67,7 @@ async function getUserContributionsByGroup(req, res){
                 groupMap.set(groupId, {
                     groupId,
                     groupName,
-                    totalPaid: hroupMap.get(groupId).totalPaid + amount
+                    totalPaid: groupMap.get(groupId).totalPaid + amount
                 });
             }else{
                 groupMap.set(groupId, {groupId, groupName, totalPaid: amount});
