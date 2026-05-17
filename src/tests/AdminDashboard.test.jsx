@@ -9,9 +9,10 @@ import AdminPage from '../pages/AdminPage'
 vi.mock('../contexts/AuthContext', () => ({
   useAuth: vi.fn(() => ({
     role: 'admin',
-    user: { uid: 'admin-123', email: 'admin@test.com' },
-    loading: false
-  }))
+    user: { uid: 'admin-123', email: 'admin@test.com', name: 'Admin User' },
+    loading: false,
+    signOut: vi.fn(),
+  })),
 }))
 
 // Mock Firebase
