@@ -4,36 +4,7 @@ import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-// ── Helpers ─
-
-function fmtDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function fmtDateTime(dateStr) {
-  return new Date(dateStr).toLocaleDateString("en-ZA", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function fmtFirestore(ts) {
-  return new Date(ts._seconds * 1000);
-}
-
-function isUpcoming(dateStr) {
-  return new Date(dateStr) > new Date();
-}
-
-// ── Reusable Field wrapper
-
+// ── Reusable Field wrapper ──
 function Field({ label, children, isLast }) {
   return (
     <section className={`field ${isLast ? "field-last" : ""}`}>
@@ -43,6 +14,7 @@ function Field({ label, children, isLast }) {
   );
 }
 
+// ── Reusable Select wrapper ──
 function SelectField({ label, id, options, value, onChange, isLast }) {
   return (
     <Field label={label} isLast={isLast}>
@@ -67,13 +39,16 @@ function SelectField({ label, id, options, value, onChange, isLast }) {
   );
 }
 
-// ── Per-section feedback banner ───────────────────────────────────────────────
-
+// ── Per-section feedback banner ──
 function SaveBanner({ feedback }) {
   if (!feedback) return null;
   return (
     <div
-      className={`save-banner ${feedback.status === "success" ? "save-banner--success" : "save-banner--error"}`}
+      className={`save-banner ${
+        feedback.status === "success"
+          ? "save-banner--success"
+          : "save-banner--error"
+      }`}
     >
       {feedback.status === "success" ? "✓ " : "✕ "}
       {feedback.message}
@@ -81,6 +56,7 @@ function SaveBanner({ feedback }) {
   );
 }
 
+// ── Per-section card footer (divider + banner + button) ──
 function CardFooter({ onSave, saving, label, feedback }) {
   return (
     <>
@@ -100,135 +76,9 @@ function CardFooter({ onSave, saving, label, feedback }) {
   );
 }
 
-// ── History section ───────
-
-function HistorySection({ groupId, groupName }) {
-  const [announcements, setAnnouncements] = useState([]);
-  const [meetings, setMeetings] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("announcements"); // 'announcements' | 'meetings'
-
-  useEffect(() => {
-    const fetch_ = async () => {
-      setLoading(true);
-      try {
-        const [annRes, meetRes] = await Promise.all([
-          fetch(
-            `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/announcements`,
-          ),
-          fetch(
-            `https://stockvel-2kvp.onrender.com/api/groups/${groupId}/meetings`,
-          ),
-        ]);
-        if (annRes.ok) setAnnouncements(await annRes.json());
-        if (meetRes.ok) setMeetings(await meetRes.json());
-      } catch (err) {
-        console.error("History fetch error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetch_();
-  }, [groupId]);
-
-  const items = tab === "announcements" ? announcements : meetings;
-
-  return (
-    <section className="card">
-      <p className="card-title">History</p>
-
-      {/* Tab row */}
-      <div className="history-tabs">
-        <button
-          className={`history-tab ${tab === "announcements" ? "history-tab--active" : ""}`}
-          onClick={() => setTab("announcements")}
-        >
-          Announcements
-          {announcements.length > 0 && (
-            <span className="history-tab-count">{announcements.length}</span>
-          )}
-        </button>
-        <button
-          className={`history-tab ${tab === "meetings" ? "history-tab--active" : ""}`}
-          onClick={() => setTab("meetings")}
-        >
-          Meetings
-          {meetings.length > 0 && (
-            <span className="history-tab-count">{meetings.length}</span>
-          )}
-        </button>
-      </div>
-
-      {loading ? (
-        <p className="history-empty">Loading history…</p>
-      ) : items.length === 0 ? (
-        <p className="history-empty">No {tab} yet for this group.</p>
-      ) : (
-        <div className="history-list">
-          {tab === "announcements"
-            ? announcements.map((a) => (
-                <div key={a.id} className="history-item history-item--ann">
-                  <div className="history-item-header">
-                    {/* Show group name as the main heading */}
-                    <span className="history-item-title">
-                      {a.groupName || groupName || "—"}
-                    </span>
-                    <span className="history-item-date">
-                      {a.createdAt ? fmtDate(fmtFirestore(a.createdAt)) : "—"}
-                    </span>
-                  </div>
-                  {/* Announcement title + message brief */}
-                  <p className="history-item-body">
-                    <strong>{a.title}: </strong>
-                    {a.message}
-                  </p>
-                </div>
-              ))
-            : meetings.map((m) => {
-                const upcoming = isUpcoming(m.date);
-                return (
-                  <div key={m.id} className="history-item history-item--meet">
-                    <div className="history-item-header">
-                      {/* Show group name as the main heading */}
-                      <span className="history-item-title">
-                        {m.groupName || groupName || "—"}
-                      </span>
-                      <span
-                        className={`history-status-badge ${upcoming ? "status-upcoming" : "status-past"}`}
-                      >
-                        {upcoming ? "Upcoming" : "Past"}
-                      </span>
-                    </div>
-                    <div className="history-item-meta">
-                      {m.date && (
-                        <span className="history-meta-chip">
-                          📅 {fmtDateTime(m.date)}
-                        </span>
-                      )}
-                      {m.location && (
-                        <span className="history-meta-chip">
-                          📍 {m.location}
-                        </span>
-                      )}
-                    </div>
-                    {/* Meeting title + agenda brief */}
-                    <p className="history-item-body">
-                      <strong>{m.title}</strong>
-                      {m.agenda && ` — ${m.agenda}`}
-                    </p>
-                  </div>
-                );
-              })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-// ── VIEW 2 — Configure form ───────────────────────────────────────────────────
-
+// ── VIEW 2 — Configure form for a selected group ──
 function ConfigureForm({ group, onBack }) {
-  // Payout rules
+  // ── Payout rules ──
   const [payoutOrder, setPayoutOrder] = useState(group.payoutOrder || "");
   const [latePenalty, setLatePenalty] = useState(group.latePenalty || "");
   const [gracePeriod, setGracePeriod] = useState(group.gracePeriod || "");
@@ -236,7 +86,7 @@ function ConfigureForm({ group, onBack }) {
   const [payoutFeedback, setPayoutFeedback] = useState(null);
   const [payoutErrors, setPayoutErrors] = useState({});
 
-  // Meeting
+  // ── Meeting schedule ──
   const [meetingFreq, setMeetingFreq] = useState(group.meetingFrequency || "");
   const [meetingDay, setMeetingDay] = useState(group.meetingDay || "");
   const [meetingTitle, setMeetingTitle] = useState("");
@@ -247,27 +97,26 @@ function ConfigureForm({ group, onBack }) {
   const [meetingFeedback, setMeetingFeedback] = useState(null);
   const [meetingErrors, setMeetingErrors] = useState({});
 
-  // Announcement
+  // ── Announcement ──
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcement, setAnnouncement] = useState("");
   const [annSaving, setAnnSaving] = useState(false);
   const [annFeedback, setAnnFeedback] = useState(null);
   const [annErrors, setAnnErrors] = useState({});
 
-  // History refresh key — increment to force HistorySection to re-fetch
-  const [historyKey, setHistoryKey] = useState(0);
-
   const flash = (setter, status, message) => {
     setter({ status, message });
     setTimeout(() => setter(null), 4000);
   };
 
+  // ── Save payout rules only ──
   const handleSavePayout = async () => {
     const e = {};
     if (!latePenalty) e.latePenalty = "This field is required.";
     if (!gracePeriod) e.gracePeriod = "This field is required.";
     setPayoutErrors(e);
     if (Object.keys(e).length > 0) return;
+
     setPayoutSaving(true);
     try {
       await updateDoc(doc(db, "groups", group.id), {
@@ -287,6 +136,7 @@ function ConfigureForm({ group, onBack }) {
     }
   };
 
+  // ── Save meeting only ──
   const handleSaveMeeting = async () => {
     const e = {};
     if (!meetingFreq) e.meetingFreq = "This field is required.";
@@ -295,12 +145,14 @@ function ConfigureForm({ group, onBack }) {
     if (!meetingDate) e.meetingDate = "This field is required.";
     setMeetingErrors(e);
     if (Object.keys(e).length > 0) return;
+
     setMeetingSaving(true);
     try {
       await updateDoc(doc(db, "groups", group.id), {
         meetingFrequency: meetingFreq,
         meetingDay,
       });
+
       const res = await fetch(
         `https://stockvel-2kvp.onrender.com/api/groups/${group.id}/schedule-meeting`,
         {
@@ -320,6 +172,7 @@ function ConfigureForm({ group, onBack }) {
         const err = await res.json();
         throw new Error(err.error || "Failed to schedule meeting");
       }
+
       setMeetingTitle("");
       setMeetingDate("");
       setMeetingLocation("");
@@ -329,7 +182,6 @@ function ConfigureForm({ group, onBack }) {
         "success",
         "Meeting scheduled and members notified.",
       );
-      setHistoryKey((k) => k + 1); // refresh history
     } catch (err) {
       flash(
         setMeetingFeedback,
@@ -341,12 +193,14 @@ function ConfigureForm({ group, onBack }) {
     }
   };
 
+  // ── Save announcement only ──
   const handleSaveAnnouncement = async () => {
     const e = {};
     if (!announcementTitle) e.announcementTitle = "This field is required.";
     if (!announcement.trim()) e.announcement = "This field is required.";
     setAnnErrors(e);
     if (Object.keys(e).length > 0) return;
+
     setAnnSaving(true);
     try {
       const res = await fetch(
@@ -365,10 +219,10 @@ function ConfigureForm({ group, onBack }) {
         const err = await res.json();
         throw new Error(err.error || "Failed to send announcement");
       }
+
       setAnnouncementTitle("");
       setAnnouncement("");
       flash(setAnnFeedback, "success", "Announcement sent to all members.");
-      setHistoryKey((k) => k + 1); // refresh history
     } catch (err) {
       flash(
         setAnnFeedback,
@@ -383,6 +237,7 @@ function ConfigureForm({ group, onBack }) {
   return (
     <section className="body">
       <section className="page">
+        {/* ── Header ── */}
         <section className="header">
           <button className="back-btn" onClick={onBack}>
             &#8592;
@@ -392,9 +247,10 @@ function ConfigureForm({ group, onBack }) {
 
         <p className="group-name">{group.groupName}</p>
 
-        {/* Payout Rules */}
+        {/* ── Payout Rules ── */}
         <section className="card">
           <p className="card-title">Payout rules</p>
+
           <SelectField
             label="Payout order"
             id="payout-order"
@@ -407,6 +263,7 @@ function ConfigureForm({ group, onBack }) {
             value={payoutOrder}
             onChange={setPayoutOrder}
           />
+
           <Field label="Late payment penalty (R)">
             <input
               type="number"
@@ -421,6 +278,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{payoutErrors.latePenalty}</span>
             )}
           </Field>
+
           <Field label="Grace period (days)" isLast>
             <input
               type="number"
@@ -435,6 +293,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{payoutErrors.gracePeriod}</span>
             )}
           </Field>
+
           <CardFooter
             onSave={handleSavePayout}
             saving={payoutSaving}
@@ -443,9 +302,10 @@ function ConfigureForm({ group, onBack }) {
           />
         </section>
 
-        {/* Meeting Schedule */}
+        {/* ── Meeting Schedule ── */}
         <section className="card">
           <p className="card-title">Schedule a meeting</p>
+
           <SelectField
             label="Meeting frequency"
             id="meeting-frequency"
@@ -459,6 +319,7 @@ function ConfigureForm({ group, onBack }) {
           {meetingErrors.meetingFreq && (
             <span className="error">{meetingErrors.meetingFreq}</span>
           )}
+
           <SelectField
             label="Day of meeting"
             id="day-of-meeting"
@@ -478,6 +339,7 @@ function ConfigureForm({ group, onBack }) {
           {meetingErrors.meetingDay && (
             <span className="error">{meetingErrors.meetingDay}</span>
           )}
+
           <Field label="Meeting title">
             <input
               type="text"
@@ -492,6 +354,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{meetingErrors.meetingTitle}</span>
             )}
           </Field>
+
           <Field label="Meeting date & time">
             <input
               type="datetime-local"
@@ -505,6 +368,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{meetingErrors.meetingDate}</span>
             )}
           </Field>
+
           <Field label="Location">
             <input
               type="text"
@@ -513,6 +377,7 @@ function ConfigureForm({ group, onBack }) {
               onChange={(e) => setMeetingLocation(e.target.value)}
             />
           </Field>
+
           <Field label="Agenda" isLast>
             <textarea
               placeholder="What will be discussed at this meeting?"
@@ -520,6 +385,7 @@ function ConfigureForm({ group, onBack }) {
               onChange={(e) => setMeetingAgenda(e.target.value)}
             />
           </Field>
+
           <CardFooter
             onSave={handleSaveMeeting}
             saving={meetingSaving}
@@ -528,9 +394,10 @@ function ConfigureForm({ group, onBack }) {
           />
         </section>
 
-        {/* Broadcast Announcement */}
+        {/* ── Broadcast Announcement ── */}
         <section className="card">
           <p className="card-title">Broadcast announcement</p>
+
           <Field label="Announcement title">
             <input
               type="text"
@@ -545,6 +412,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{annErrors.announcementTitle}</span>
             )}
           </Field>
+
           <Field label="Message to all members" isLast>
             <textarea
               placeholder="Type your announcement here…"
@@ -558,6 +426,7 @@ function ConfigureForm({ group, onBack }) {
               <span className="error">{annErrors.announcement}</span>
             )}
           </Field>
+
           <CardFooter
             onSave={handleSaveAnnouncement}
             saving={annSaving}
@@ -565,20 +434,12 @@ function ConfigureForm({ group, onBack }) {
             feedback={annFeedback}
           />
         </section>
-
-        {/* History — auto-refreshes when a meeting or announcement is saved */}
-        <HistorySection
-          key={historyKey}
-          groupId={group.id}
-          groupName={group.groupName}
-        />
       </section>
     </section>
   );
 }
 
-// ── VIEW 1 — Group list ───
-
+// ── VIEW 1 — List of all active groups ──
 function GroupList({ onSelect }) {
   const { user } = useAuth();
   const [groups, setGroups] = useState([]);
@@ -594,10 +455,15 @@ function GroupList({ onSelect }) {
         );
         if (!res.ok) throw new Error("Failed to fetch groups");
         const data = await res.json();
+
         if (user) {
           const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) setUserGroupIds(userDoc.data().groups || []);
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserGroupIds(userData.groups || []);
+          }
         }
+
         setGroups(data);
       } catch (err) {
         setError(err.message);
@@ -614,7 +480,7 @@ function GroupList({ onSelect }) {
     return false;
   });
 
-  if (loading)
+  if (loading) {
     return (
       <div
         style={{
@@ -626,7 +492,9 @@ function GroupList({ onSelect }) {
         Loading groups…
       </div>
     );
-  if (error)
+  }
+
+  if (error) {
     return (
       <div
         style={{
@@ -641,7 +509,9 @@ function GroupList({ onSelect }) {
         Error loading groups: {error}
       </div>
     );
-  if (userGroups.length === 0)
+  }
+
+  if (userGroups.length === 0) {
     return (
       <div
         style={{
@@ -653,6 +523,7 @@ function GroupList({ onSelect }) {
         You are not a member of any groups yet.
       </div>
     );
+  }
 
   return (
     <section className="active-groups-container">
@@ -695,6 +566,7 @@ function GroupList({ onSelect }) {
               </span>
             </div>
           </section>
+
           <section className="active-Member-grid">
             <section className="active-Member-stat">
               <span className="stat-label">Contribution</span>
@@ -714,7 +586,12 @@ function GroupList({ onSelect }) {
               <span className="stat-label">Duration</span>
               <span className="stat-value">{group.duration} months</span>
             </section>
+            <section className="active-Member-stat">
+              <span className="stat-label">Payout order</span>
+              <span className="stat-value">{group.payoutOrder || "—"}</span>
+            </section>
           </section>
+
           <p className="active-Member-date">
             Created{" "}
             {new Date(group.createdAt).toLocaleDateString("en-ZA", {
@@ -729,8 +606,7 @@ function GroupList({ onSelect }) {
   );
 }
 
-// ── ROOT EXPORT ───────────
-
+// ── ROOT EXPORT ──
 export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [loadingPreselected, setLoadingPreselected] =
@@ -744,7 +620,10 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
           const res = await fetch(
             `https://stockvel-2kvp.onrender.com/api/groups/${preselectedGroupId}`,
           );
-          if (res.ok) setSelectedGroup(await res.json());
+          if (res.ok) {
+            const groupData = await res.json();
+            setSelectedGroup(groupData);
+          }
         } catch (err) {
           console.error("Failed to fetch preselected group:", err);
         } finally {
@@ -755,7 +634,7 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
     }
   }, [preselectedGroupId]);
 
-  if (loadingPreselected)
+  if (loadingPreselected) {
     return (
       <div className="dashboard-page">
         <div className="dashboard-inner">
@@ -763,14 +642,18 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
         </div>
       </div>
     );
+  }
 
   if (selectedGroup) {
     return (
       <ConfigureForm
         group={selectedGroup}
         onBack={() => {
-          if (preselectedGroupId) navigate("/browse-groups");
-          else setSelectedGroup(null);
+          if (preselectedGroupId) {
+            navigate("/browse-groups");
+          } else {
+            setSelectedGroup(null);
+          }
         }}
       />
     );
@@ -799,6 +682,7 @@ export default function ConfigureGroupPage({ onBack, preselectedGroupId }) {
           </div>
           <p>Click any group below to manage its settings.</p>
         </div>
+
         <GroupList onSelect={setSelectedGroup} />
       </div>
     </div>

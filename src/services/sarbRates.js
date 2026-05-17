@@ -2,7 +2,7 @@ const API_BASE_URL = import.meta.env.VITE_SARB_API_BASE_URL || "http://localhost
 
 export async function fetchSarbRates() {
   try {
-    const response = await fetch(`${API_BASE_URL}/rates`);
+    const response = await fetch(`${API_BASE_URL}/sarb-rates`);
     
     if(!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);  

@@ -7,114 +7,6 @@ import '../index.css';
 
 const ROLES = ['user', 'treasurer', 'admin'];
 
-const isPaid = (s) => ['paid', 'completed'].includes(s?.toLowerCase());
-const fmtMoney = (n) => `R ${Number(n).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`;
-const fmtDate = (d) => {
-  if (!d) return '—';
-  try {
-    const date = d?.toDate ? d.toDate() : new Date(d);
-    return date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
-  } catch { return '—'; }
-};
-
-/* ── CSV export ── */
-function exportCSV(contributions) {
-  const rows = [
-    ['StokvelHub — Platform Report'],
-    [`Generated: ${new Date().toLocaleString('en-ZA')}`],
-    [],
-    ['Member', 'Group', 'Amount (ZAR)', 'Payment Method', 'Type', 'Status', 'Date'],
-    ...contributions.map(c => [
-      c.member || c.userId || '—',
-      c.groupId || '—',
-      c.amount,
-      c.paymentMethod || '—',
-      c.type || 'monthly',
-      c.status || 'pending',
-      c.date || '—',
-    ]),
-    [],
-    ['Total Collected', contributions.filter(c => isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0)],
-    ['Total Pending', contributions.filter(c => !isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0)],
-  ];
-  const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `stokvel-admin-report-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/* ── PDF export ── */
-function exportPDF(contributions, stats, groupCount, userCount) {
-  const rows = contributions.slice(0, 200).map(c => `
-    <tr>
-      <td>${c.member || c.userId || '—'}</td>
-      <td>${c.groupId || '—'}</td>
-      <td style="text-align:right">${fmtMoney(c.amount)}</td>
-      <td style="text-transform:capitalize">${c.paymentMethod || '—'}</td>
-      <td>
-        <span style="background:${isPaid(c.status) ? '#dcfce7' : '#fef9c3'};
-                     color:${isPaid(c.status) ? '#166534' : '#854d0e'};
-                     padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600">
-          ${c.status || 'pending'}
-        </span>
-      </td>
-      <td>${c.date || '—'}</td>
-    </tr>`).join('');
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>StokvelHub Admin Report</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Segoe UI',sans-serif;color:#1a1a1a;padding:40px}
-    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:3px solid #1e4a2a;padding-bottom:18px}
-    .brand{font-size:22px;font-weight:800;color:#1e4a2a}.brand span{color:#f4b942}
-    .meta{font-size:12px;color:#666;text-align:right}
-    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:24px}
-    .stat{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px;text-align:center}
-    .stat-val{font-size:16px;font-weight:800;color:#1e4a2a}.stat-label{font-size:10px;color:#666;margin-top:3px}
-    h2{font-size:15px;color:#1e4a2a;margin-bottom:12px}
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th{background:#1e4a2a;color:white;padding:8px 10px;text-align:left;font-weight:600}
-    td{padding:8px 10px;border-bottom:1px solid #e5e7eb}
-    tr:nth-child(even) td{background:#f9fafb}
-    .footer{margin-top:24px;font-size:10px;color:#999;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}
-    @media print{body{padding:20px}}
-  </style></head><body>
-  <div class="header">
-    <div>
-      <div class="brand">Stokvel<span>Hub</span></div>
-      <div style="font-size:13px;color:#444;margin-top:4px">Admin Platform Report</div>
-    </div>
-    <div class="meta">
-      <div><strong>Administrator</strong></div>
-      <div>Generated: ${new Date().toLocaleString('en-ZA')}</div>
-    </div>
-  </div>
-  <div class="stats">
-    <div class="stat"><div class="stat-val">${fmtMoney(stats.totalCollected)}</div><div class="stat-label">Total Collected</div></div>
-    <div class="stat"><div class="stat-val">${fmtMoney(stats.totalPending)}</div><div class="stat-label">Pending</div></div>
-    <div class="stat"><div class="stat-val">${contributions.length}</div><div class="stat-label">Transactions</div></div>
-    <div class="stat"><div class="stat-val">${groupCount}</div><div class="stat-label">Groups</div></div>
-    <div class="stat"><div class="stat-val">${userCount}</div><div class="stat-label">Members</div></div>
-  </div>
-  <h2>All Contributions ${contributions.length > 200 ? '(first 200 shown)' : ''}</h2>
-  <table>
-    <thead><tr><th>Member</th><th>Group</th><th>Amount</th><th>Method</th><th>Status</th><th>Date</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="footer">StokvelHub — Empowering Communities Through Collective Savings</div>
-  </body></html>`;
-
-  const win = window.open('', '_blank');
-  win.document.write(html);
-  win.document.close();
-  win.onload = () => { win.focus(); win.print(); };
-}
-
 function AdminPage() {
   const { role } = useAuth();
   const [users, setUsers]       = useState([]);
@@ -129,22 +21,12 @@ function AdminPage() {
   const navigate = useNavigate();
   const isAdmin = role === 'admin';
 
-  /* ── reports state ── */
-  const [activeTab, setActiveTab]           = useState('users');
-  const [contributions, setContributions]   = useState([]);
-  const [groups, setGroups]                 = useState([]);
-  const [reportsLoading, setReportsLoading] = useState(false);
-  const [filterStatus, setFilterStatus]     = useState('all');
-  const [filterGroup, setFilterGroup]       = useState('all');
-  const [sortField, setSortField]           = useState('date');
-  const [sortDir, setSortDir]               = useState('desc');
-
-  /* ── fetch users ── */
   useEffect(() => {
-    (async () => {
+    const fetchUsers = async () => {
       try {
         const snap = await getDocs(collection(db, 'users'));
-        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        setUsers(data);
       } catch (err) {
         console.error('Failed to fetch users:', err);
       } finally {
@@ -170,78 +52,33 @@ function AdminPage() {
     fetchRoleRequests();
   }, []);
 
-  /* ── fetch reports data when tab opens ── */
-  useEffect(() => {
-    if (activeTab !== 'reports') return;
-    (async () => {
-      setReportsLoading(true);
-      try {
-        const [contribSnap, groupsSnap] = await Promise.all([
-          getDocs(collection(db, 'Contributions')),
-          getDocs(collection(db, 'groups')),
-        ]);
-        setContributions(contribSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        setGroups(groupsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      } catch (err) {
-        console.error('Failed to fetch reports data:', err);
-      } finally {
-        setReportsLoading(false);
-      }
-    })();
-  }, [activeTab]);
-
-  /* ── stats ── */
-  const totalCollected = contributions.filter(c => isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0);
-  const totalPending   = contributions.filter(c => !isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0);
-  const paidCount      = contributions.filter(c => isPaid(c.status)).length;
-  const compliance     = contributions.length ? (paidCount / contributions.length) * 100 : 0;
-
-  /* ── per-group breakdown ── */
-  const groupBreakdown = groups.map(g => {
-    const gc = contributions.filter(c => c.groupId === g.id);
-    const collected = gc.filter(c => isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0);
-    const pending   = gc.filter(c => !isPaid(c.status)).reduce((s, c) => s + Number(c.amount), 0);
-    return { ...g, transactionCount: gc.length, collected, pending };
-  }).sort((a, b) => b.collected - a.collected);
-
-  /* ── unique groups for filter ── */
-  const groupIds = ['all', ...new Set(contributions.map(c => c.groupId).filter(Boolean))];
-
-  /* ── filtered + sorted table ── */
-  const filtered = contributions
-    .filter(c => filterStatus === 'all' ? true : (filterStatus === 'paid' ? isPaid(c.status) : !isPaid(c.status)))
-    .filter(c => filterGroup === 'all' ? true : c.groupId === filterGroup)
-    .sort((a, b) => {
-      const va = sortField === 'amount' ? Number(a.amount) : new Date(a.date || 0);
-      const vb = sortField === 'amount' ? Number(b.amount) : new Date(b.date || 0);
-      return sortDir === 'asc' ? va - vb : vb - va;
-    });
-
-  const toggleSort = (field) => {
-    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortField(field); setSortDir('desc'); }
-  };
-
   const handleRoleChange = async (userId, newRole, currentRole) => {
     const userName = users.find(u => u.id === userId)?.name || 'this user';
-    if (!window.confirm(`Change "${userName}" from "${currentRole}" to "${newRole}"?\n\nThis will affect their access immediately.`)) return;
+    const confirmed = window.confirm(
+      `Change "${userName}" from "${currentRole}" to "${newRole}"?\n\nThis will affect their access immediately.`
+    );
+    if (!confirmed) return;
+
     setUpdating(userId);
     try {
       await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
-    } catch {
+    } catch (err) {
       alert('Failed to update role. Please try again.');
     } finally {
       setUpdating(null);
     }
   };
 
-  const filtered_users = users.filter(u =>
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
+  const filtered = users.filter(u =>
+    (u.name?.toLowerCase().includes(search.toLowerCase()) ||
+     u.email?.toLowerCase().includes(search.toLowerCase()))
   );
 
-  useEffect(() => { setCurrentPage(1); }, [search]);
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
 
   const counts = {
     total:     users.length,
@@ -249,33 +86,6 @@ function AdminPage() {
     treasurer: users.filter(u => u.role === 'treasurer').length,
     user:      users.filter(u => u.role === 'user').length,
   };
-
-  /* ── shared styles ── */
-  const tabBtn = (id) => ({
-    padding: '0.55rem 1.2rem',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 600,
-    fontSize: '0.88rem',
-    background: activeTab === id ? '#1e4a2a' : 'transparent',
-    color: activeTab === id ? 'white' : '#555',
-    transition: 'all .2s',
-  });
-
-  const pill = (active) => ({
-    padding: '0.35rem 1rem', borderRadius: '8px', border: '1px solid #ddd',
-    cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600,
-    background: active ? '#1e4a2a' : 'white',
-    color: active ? 'white' : '#555', transition: 'all .15s',
-  });
-
-  const th = (field) => ({
-    padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem',
-    textTransform: 'uppercase', letterSpacing: '0.07em', color: '#777',
-    fontWeight: 700, borderBottom: '2px solid #e5e7eb',
-    cursor: field ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap',
-  });
 
   return (
     <div className="dashboard-page">
@@ -285,7 +95,6 @@ function AdminPage() {
           <p>Manage users, assign roles, and oversee all stokvel groups.</p>
         </div>
 
-        {/* stat cards */}
         <div className="stats-grid" style={{ marginBottom: '2rem' }}>
           <div className="stat-card accent-blue">
             <div className="stat-label">Total users</div>
@@ -309,7 +118,7 @@ function AdminPage() {
           </div>
         </div>
 
-        {/* quick actions */}
+        {/* Quick actions - removed Browse groups button since it's in BottomNav */}
         <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
           <button className="btn btn-primary" onClick={() => navigate('/create-group')}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">

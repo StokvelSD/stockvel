@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { fetchSarbRates } from "../services/sarbRates";
 
-const SavingsProjection = ({ userBalance = 0 }) => {
+const SavingsProjection = ({ userBalance = 5000 }) => {
     const [rates, setRates] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -96,8 +96,6 @@ const SavingsProjection = ({ userBalance = 0 }) => {
                                 <option value={12}>1 year</option>
                                 <option value={24}>2 years</option>
                                 <option value={36}>3 years</option>
-                                <option value={60}>5 years</option>
-                                <option value={120}>10 years</option>
 
                             </select>
                         </form>

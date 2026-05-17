@@ -212,6 +212,8 @@ body {
 
 /* =====================
    Per-section save button
+   — sits inside each card,
+     aligned to the right
    ===================== */
 .save-btn {
   align-self: flex-end;
@@ -247,6 +249,8 @@ body {
 
 /* =====================
    Save feedback banner
+   — success & error variants,
+     scoped per card
    ===================== */
 .save-banner {
   border-radius: 8px;
@@ -282,6 +286,8 @@ body {
 
 /* =====================
    Card footer row
+   — keeps button right-aligned
+     and banner left of it if needed
    ===================== */
 .card-footer {
   display: flex;
@@ -291,7 +297,8 @@ body {
 }
 
 /* =====================
-   Card divider
+   Divider between card body
+   and its footer area
    ===================== */
 .card-divider {
   height: 1px;
@@ -316,165 +323,5 @@ body {
     align-self: stretch;
     width: 100%;
     text-align: center;
-  }
-}
-
-/* =====================================================================
-   HISTORY SECTION
-   ===================================================================== */
-
-.history-tabs {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1.25rem;
-}
-
-.history-tab {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 1rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  font-family: inherit;
-  border: 1.5px solid #e0dfd9;
-  border-radius: 8px;
-  background: #fafaf9;
-  color: #777;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    border-color 0.15s,
-    color 0.15s;
-}
-
-.history-tab:hover {
-  background: #f0efeb;
-}
-
-.history-tab--active {
-  background: #1a7f54;
-  border-color: #1a7f54;
-  color: #fff;
-}
-
-.history-tab-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 0 4px;
-  background: rgba(0, 0, 0, 0.12);
-  color: inherit;
-}
-
-.history-tab--active .history-tab-count {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-.history-empty {
-  text-align: center;
-  color: #999;
-  font-size: 0.875rem;
-  padding: 1.5rem 0;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-}
-
-.history-item {
-  border: 1px solid #e0dfd9;
-  border-radius: 10px;
-  padding: 0.9rem 1.1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  background: #fafaf9;
-}
-
-.history-item--ann {
-  border-left: 3px solid #f59e0b;
-}
-.history-item--meet {
-  border-left: 3px solid #3b82f6;
-}
-
-.history-item-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.history-item-title {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #1a1a1a;
-}
-
-.history-item-date {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #aaa;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-
-.history-status-badge {
-  font-size: 0.68rem;
-  font-weight: 700;
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-}
-
-.history-status-badge.status-upcoming {
-  background: #d1fae5;
-  color: #065f46;
-}
-.history-status-badge.status-past {
-  background: #e5e7eb;
-  color: #4b5563;
-}
-
-.history-item-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.history-meta-chip {
-  font-size: 0.75rem;
-  color: #666;
-  background: rgba(0, 0, 0, 0.05);
-  padding: 0.18rem 0.55rem;
-  border-radius: 999px;
-}
-
-.history-item-body {
-  font-size: 0.85rem;
-  color: #555;
-  line-height: 1.5;
-  margin: 0;
-}
-
-@media (max-width: 768px) {
-  .history-tabs {
-    flex-direction: column;
-  }
-
-  .history-tab {
-    justify-content: center;
   }
 }
