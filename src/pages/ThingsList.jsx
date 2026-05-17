@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchPaidContributions } from "../services/contributions";
+import { fetchAllContributions } from "../services/contributions";
 
 const ThingsList = () => {
   const [contributions, setContributions] = useState([]);
@@ -9,7 +9,7 @@ const ThingsList = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const data = await fetchPaidContributions();
+        const data = await fetchAllContributions();
         setContributions(data);
       } catch (err) {
         setError(err.message);
