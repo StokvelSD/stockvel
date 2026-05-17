@@ -1,11 +1,58 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("./serviceAccountKey.json");
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+let db = null;
+
+
+function initializeFirebase() {
+  if (admin.apps.length) return;
+  
+  let serviceAccount;
+  
+ 
+  try {
+    serviceAccount = require("./serviceAccountKey.json");
+    console.log("Using service account JSON file");
+  } catch (e) {
+    console.log("No service account file, using environment variables");
+    
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    if (privateKey) {
+      privateKey = privateKey.replace(/\\n/g, "\n").replace(/^"|"$/g, '');
+    }
+    
+    serviceAccount = {
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      privateKey: privateKey,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    };
+  }
+  
+ 
+  if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
+    console.error("Missing Firebase credentials");
+    return false;
+  }
+  
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("Firebase Admin initialized for:", serviceAccount.projectId);
+    return true;
+  } catch (error) {
+    console.error("Firebase init failed:", error.message);
+    return false;
+  }
 }
 
-const db = admin.firestore();
-module.exports = db;
+
+const initialized = initializeFirebase();
+
+if (initialized) {
+  db = admin.firestore();
+  console.log("Firestore instance created");
+}
+
+const getFirestore = () => db;
+
+module.exports = { admin, db, getFirestore };

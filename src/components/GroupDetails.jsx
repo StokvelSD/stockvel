@@ -30,7 +30,7 @@ function GroupDetails() {
   const [members, setMembers] = useState([]);
   const [memberPage, setMemberPage] = useState(1);
   const [payoutProjections, setPayoutProjections] = useState([]);
-  const [saRates, setSaRates] = useState({ repo: 8.25, prime: 11.75 });
+  const [saRates, setSaRates] = useState({ repo: 6.73, prime: 10.23 });
   const [removingMember, setRemovingMember] = useState(null);
   const paymentTriggered = useRef(false);
 
@@ -91,7 +91,7 @@ useEffect(() => {
       }
     } catch (err) {
       console.error('SARB Fetch Error (using fallbacks):', err);
-      setSaRates({ repo: 8.25, prime: 11.75 });
+      setSaRates({ repo: 6.73, prime: 10.23 });
     }
   };
 
