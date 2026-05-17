@@ -8,6 +8,7 @@ coverage:
       default:
         target: 50%
 
+
 comment:
   layout: "reach,diff,flags,files"
   behavior: default

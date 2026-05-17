@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayRemove, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayRemove, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { PaystackButton, usePaystackPayment } from 'react-paystack';
 
 function GroupDetails() {
+  const [contributions, setContributions] = useState([]);
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -85,6 +86,7 @@ function GroupDetails() {
       if (groupDoc.exists()) {
         const groupData = { id: groupDoc.id, ...groupDoc.data() };
         setGroup(groupData);
+        fetchGroupContributions();
 
         const memberIds = groupData.members || [];
         const membersData = [];
@@ -107,6 +109,31 @@ function GroupDetails() {
       setLoading(false);
     }
   };
+
+  const fetchGroupContributions = async () => {
+  try {
+const q = query(
+  collection(db, 'payments'),
+  where('groupId', '==', id),
+  where('userId', '==', user?.uid)
+);
+
+    const snapshot = await getDocs(q);
+    const data = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    // Optional: newest first
+    data.sort((a, b) =>
+      (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+    );
+
+    setContributions(data);
+  } catch (err) {
+    console.error('Failed to fetch contributions:', err);
+  }
+};
 
   const calculateProjections = (groupData, sortedMembers, primeRate) => {
     const frequency = groupData.meetingFrequency?.toLowerCase() || 'monthly';
@@ -265,9 +292,32 @@ function GroupDetails() {
     }
   };
 
-  const handlePaystackSuccessAction = () => {
-    alert("Payment successful! Waiting for the server to confirm your transaction.");
-  };
+const handlePaystackSuccessAction = async (reference) => {
+  try {
+    const q = query(
+      collection(db, 'payments'),
+      where('reference', '==', reference.reference)
+    );
+
+    const existing = await getDocs(q);
+
+    if (!existing.empty) {
+      console.log("Payment already recorded");
+      return;
+    }
+
+    await addDoc(collection(db, 'payments'), {
+      userId: user?.uid,
+      groupId: id,
+      amount: group?.contributionAmount,
+      reference: reference.reference,
+      createdAt: serverTimestamp(),
+    });
+
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const handlePaystackCloseAction = () => {
     console.log('User closed the payment window');
@@ -498,6 +548,44 @@ function GroupDetails() {
             </>
           )}
         </div>
+
+        <div className="section-card">
+  <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>
+    Contributions
+  </h3>
+
+  {contributions.length === 0 ? (
+    <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+      No contributions yet for this group
+    </p>
+  ) : (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
+      {contributions.map(c => (
+        <div
+          key={c.id}
+          style={{
+            padding: '0.75rem 1rem',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            backgroundColor: c.userId === user?.uid ? '#f0f9ff' : 'white',
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>
+            R {c.amount}
+          </div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Paid by: {c.userName}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {c.createdAt?.toDate
+              ? c.createdAt.toDate().toLocaleDateString()
+              : ''}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
       </div>
     </div>
   );

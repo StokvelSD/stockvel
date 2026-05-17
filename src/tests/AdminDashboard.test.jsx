@@ -5,6 +5,16 @@ import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 import AdminPage from '../pages/AdminPage'
 
+// Mock AuthContext
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: vi.fn(() => ({
+    role: 'admin',
+    user: { uid: 'admin-123', email: 'admin@test.com', name: 'Admin User' },
+    loading: false,
+    signOut: vi.fn(),
+  })),
+}))
+
 // Mock Firebase
 vi.mock('../firebase/firebase', () => ({
   db: {},
