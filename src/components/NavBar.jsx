@@ -96,19 +96,6 @@ const Navbar = () => {
               Browse Groups
             </Link>
 
-            {/* Contributions - ONLY for regular users and treasurers, NOT for admin */}
-            {!isAdmin && (
-              <>
-                <Link to="/contributions" className="nav-link" onClick={() => setIsOpen(false)}>
-                  Contributions
-                </Link>
-                
-                <Link to="/add-contribution" className="nav-link" onClick={() => setIsOpen(false)}>
-                  Add Contribution
-                </Link>
-              </>
-            )}
-
             {/* Treasurer-specific links */}
             {isTreasurer && (
               <Link to="/treasurer/manage" className="nav-link" onClick={() => setIsOpen(false)}>

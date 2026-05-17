@@ -13,7 +13,7 @@ import Register from "./components/Register";
 import AdminDashboard from "./components/AdminDashboard";
 import TreasurerDashboard from "./components/TreasurerDashboard.jsx";
 import UserDashboard from "./components/UserDashboard";
-import Dashboard from "./pages/Dashboard.jsx";
+//import Dashboard from "./pages/Dashboard.jsx";
 import AdminPage from "./pages/AdminPage";
 import Notifications from "./components/Notifications.jsx";
 import AdminReportsPage from "./pages/AdminReportsPage.jsx";
@@ -79,8 +79,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route path="/contributions" element={<Dashboard />} />
           <Route path="/configure-group" element={<ConfigureGroupPage />} />
           <Route
             path="/configure-group/:groupId"

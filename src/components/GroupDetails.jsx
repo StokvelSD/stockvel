@@ -2,11 +2,25 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase/firebase';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, arrayRemove, deleteDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+  updateDoc,
+  arrayRemove,
+  deleteDoc,
+  addDoc,
+  serverTimestamp,
+  onSnapshot
+} from 'firebase/firestore';
 import { PaystackButton, usePaystackPayment } from 'react-paystack';
 
 function GroupDetails() {
   const [contributions, setContributions] = useState([]);
+  const [hasPaidThisMonth, setHasPaidThisMonth] = useState(false);
   const { id } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -36,10 +50,11 @@ function GroupDetails() {
 
   const initializePayment = usePaystackPayment(paystackConfig);
 
-  useEffect(() => {
-    fetchSaRates();
-    fetchGroupDetails();
-  }, [id, user]);
+useEffect(() => {
+  fetchSaRates();
+  fetchGroupDetails();
+  //checkMonthlyPaymentStatus();
+}, [id, user]);
 
   useEffect(() => {
     if (group) {
@@ -86,7 +101,7 @@ function GroupDetails() {
       if (groupDoc.exists()) {
         const groupData = { id: groupDoc.id, ...groupDoc.data() };
         setGroup(groupData);
-        fetchGroupContributions();
+const unsubscribePayments = fetchGroupContributions();
 
         const memberIds = groupData.members || [];
         const membersData = [];
@@ -110,26 +125,45 @@ function GroupDetails() {
     }
   };
 
-  const fetchGroupContributions = async () => {
+const fetchGroupContributions = () => {
   try {
-const q = query(
-  collection(db, 'payments'),
-  where('groupId', '==', id),
-  where('userId', '==', user?.uid)
-);
+    let q;
 
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    // Admins and treasurers see ALL payments
+if (!isAdmin && !isTreasurer) {
+  q = query(
+    collection(db, 'payments'),
+    where('groupId', '==', id),
+    where('userId', '==', user?.uid)
+  );
+} else {
+      // Normal members only see their own contributions
+      q = query(
+        collection(db, 'payments'),
+        where('groupId', '==', id),
+        where('userId', '==', user?.uid)
+      );
+    }
 
-    // Optional: newest first
-    data.sort((a, b) =>
-      (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
-    );
+    // Realtime listener
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-    setContributions(data);
+      // newest first
+      data.sort(
+        (a, b) =>
+          (b.createdAt?.seconds || 0) -
+          (a.createdAt?.seconds || 0)
+      );
+
+      setContributions(data);
+    });
+
+    return unsubscribe;
+
   } catch (err) {
     console.error('Failed to fetch contributions:', err);
   }
@@ -308,14 +342,24 @@ const handlePaystackSuccessAction = async (reference) => {
 
     await addDoc(collection(db, 'payments'), {
       userId: user?.uid,
+      userName: user?.displayName || user?.email,
       groupId: id,
       amount: group?.contributionAmount,
       reference: reference.reference,
       createdAt: serverTimestamp(),
     });
 
+    // Immediately disable button
+    setHasPaidThisMonth(true);
+
+    // Re-check status
+    //await checkMonthlyPaymentStatus();
+
+    alert("Contribution payment recorded successfully!");
+
   } catch (err) {
     console.error(err);
+    alert("Failed to record payment");
   }
 };
 
@@ -325,7 +369,9 @@ const handlePaystackSuccessAction = async (reference) => {
 
   const componentProps = {
     ...paystackConfig,
-    text: `Pay R${group?.contributionAmount || 0} Now`,
+    text: hasPaidThisMonth
+  ? 'Contribution Already Paid'
+  : `Pay R${group?.contributionAmount || 0} Now`,
     onSuccess: handlePaystackSuccessAction,
     onClose: handlePaystackCloseAction,
   };
@@ -338,6 +384,49 @@ const handlePaystackSuccessAction = async (reference) => {
   const userRole = userMemberData?.role || 'user';
   const isAdmin = userRole === 'admin';
   const isTreasurer = userRole === 'treasurer';
+
+  useEffect(() => {
+  if (!group || !user) return;
+
+  const unsubscribe = fetchGroupContributions();
+
+  return () => {
+    if (unsubscribe) unsubscribe();
+  };
+}, [group, user, id, isAdmin, isTreasurer]);
+
+useEffect(() => {
+  if (!user || !id) return;
+
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const q = query(
+    collection(db, 'payments'),
+    where('groupId', '==', id),
+    where('userId', '==', user.uid)
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    let paid = false;
+
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+
+      if (data.createdAt?.toDate) {
+        const date = data.createdAt.toDate();
+
+        if (date >= startOfMonth) {
+          paid = true;
+        }
+      }
+    });
+
+    setHasPaidThisMonth(paid);
+  });
+
+  return () => unsubscribe();
+}, [id, user]);
 
   if (loading) return <div className="dashboard-page"><div className="dashboard-inner"><p>Loading group details...</p></div></div>;
   if (!group) return <div className="dashboard-page"><div className="dashboard-inner"><p>Group not found</p><button className="btn btn-primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</button></div></div>;
@@ -356,11 +445,19 @@ const handlePaystackSuccessAction = async (reference) => {
               {group.description && <p>{group.description}</p>}
             </div>
             {isMember && (
-              <PaystackButton
-                {...componentProps}
-                className="btn btn-primary"
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}
-              />
+  <PaystackButton
+    key={hasPaidThisMonth ? 'paid' : 'unpaid'}
+    {...componentProps}
+    className="btn btn-primary"
+    disabled={hasPaidThisMonth}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      cursor: hasPaidThisMonth ? 'not-allowed' : 'pointer',
+      opacity: hasPaidThisMonth ? 0.6 : 1
+    }}
+  />
             )}
           </div>
 
@@ -550,15 +647,27 @@ const handlePaystackSuccessAction = async (reference) => {
         </div>
 
         <div className="section-card">
-  <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>
-    Contributions
-  </h3>
-
-  {contributions.length === 0 ? (
-    <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
-      No contributions yet for this group
-    </p>
-  ) : (
+<h3
+  style={{
+    textTransform: 'uppercase',
+    fontSize: '0.9rem',
+    letterSpacing: '0.05em',
+    color: '#64748b'
+  }}
+>
+  {isAdmin || isTreasurer
+    ? 'Group Payment History'
+    : 'My Contributions'}
+</h3>
+{!isMember ? (
+  <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+    You are not a member of this group
+  </p>
+) : contributions.length === 0 ? (
+  <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
+    No contributions yet for this group
+  </p>
+) : (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
       {contributions.map(c => (
         <div
@@ -573,9 +682,11 @@ const handlePaystackSuccessAction = async (reference) => {
           <div style={{ fontWeight: 600 }}>
             R {c.amount}
           </div>
-          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Paid by: {c.userName}
-          </div>
+{(isAdmin || isTreasurer) && (
+  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+    Paid by: {c.userName || c.userId}
+  </div>
+)}
           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             {c.createdAt?.toDate
               ? c.createdAt.toDate().toLocaleDateString()

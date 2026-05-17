@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import MyGroups from "../components/MyGroups";
 import SavingsProjection from "./SavingsProjection";
-import { fetchTotalPaid, fetchContributionsByGroup } from "../services/contributions";
+//import { fetchTotalPaid, fetchContributionsByGroup } from "../services/contributions";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -133,29 +133,29 @@ const UserDashboard = () => {
   }, [user]);
 
 
-  useEffect(() => {
-    const loadRealContributionData = async () => {
-      if(!user)return;
-      setLoadingRealData(true);
+  // useEffect(() => {
+  //   const loadRealContributionData = async () => {
+  //     if(!user)return;
+  //     setLoadingRealData(true);
 
-      try{
-        const {total, count, contributions} = await fetchTotalPaid();
-        setTotalPaid(total);
-        setContributionCount(count);
-        setPaymentHistory(contributions);
+  //     try{
+  //       const {total, count, contributions} = await fetchTotalPaid();
+  //       setTotalPaid(total);
+  //       setContributionCount(count);
+  //       setPaymentHistory(contributions);
 
-        const byGroup = await fetchContributionsByGroup();
-        setGroupContributions(byGroup);
+  //       const byGroup = await fetchContributionsByGroup();
+  //       setGroupContributions(byGroup);
 
-        setUpComingPayments([]);
-      }catch(error){
-        console.error("Error loading contribution data", error);
-      }finally{
-        setLoadingRealData(false);
-      }
-    };
-    loadRealContributionData();
-  }, [user]);
+  //       setUpComingPayments([]);
+  //     }catch(error){
+  //       console.error("Error loading contribution data", error);
+  //     }finally{
+  //       setLoadingRealData(false);
+  //     }
+  //   };
+  //   loadRealContributionData();
+  // }, [user]);
 
 
   const fetchAvailableGroups = async () => {
