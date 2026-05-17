@@ -26,7 +26,11 @@ const UserDashboard = () => {
   const [messageMap, setMessageMap] = useState({});
   const [showBrowseGroups, setShowBrowseGroups] = useState(false);
   const [userGroups, setUserGroups] = useState([]);
+  const [userRole, setUserRole] = useState("user");
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [adminRequestPending, setAdminRequestPending] = useState(false);
+  const [adminRequestDoc, setAdminRequestDoc] = useState(null);
+  const [sendingAdminRequest, setSendingAdminRequest] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [sendingRequest, setSendingRequest] = useState(null);
 
@@ -97,13 +101,35 @@ const UserDashboard = () => {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
-          setUserGroups(userDoc.data().groups || []);
+          const data = userDoc.data();
+          setUserGroups(data.groups || []);
+          setUserRole(data.role || "user");
         }
       } catch (err) {
         console.error("Failed to load user groups:", err);
       }
     };
     loadUserGroups();
+  }, [user]);
+
+  useEffect(() => {
+    const loadAdminRequest = async () => {
+      if (!user) return;
+      try {
+        const q = query(
+          collection(db, "adminRequests"),
+          where("userId", "==", user.uid),
+        );
+        const snap = await getDocs(q);
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const pending = docs.find((r) => r.status === "pending");
+        setAdminRequestPending(!!pending);
+        setAdminRequestDoc(pending || null);
+      } catch (err) {
+        console.error("Failed to load admin request:", err);
+      }
+    };
+    loadAdminRequest();
   }, [user]);
 
 
@@ -271,6 +297,56 @@ const UserDashboard = () => {
       );
     } finally {
       setSendingRequest(null);
+    }
+  };
+
+  const handleRequestAdmin = async () => {
+    if (!user) {
+      setMessage("admin", "error", "Please log in to request admin role");
+      return;
+    }
+    if (adminRequestPending) {
+      setMessage("admin", "error", "You already have a pending admin request");
+      return;
+    }
+    setSendingAdminRequest(true);
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      const docRef = await addDoc(collection(db, "adminRequests"), {
+        userId: user.uid,
+        userName: userData.name || user.displayName || user.email,
+        userEmail: user.email,
+        status: "pending",
+        requestedAt: new Date(),
+      });
+      setAdminRequestPending(true);
+      setAdminRequestDoc({ id: docRef.id, userId: user.uid, status: "pending" });
+      setMessage("admin", "success", "Admin request sent. An admin will review it.");
+    } catch (err) {
+      console.error("Failed to request admin:", err);
+      setMessage("admin", "error", "Failed to send admin request. Please try again.");
+    } finally {
+      setSendingAdminRequest(false);
+    }
+  };
+
+  const handleCancelAdminRequest = async () => {
+    if (!adminRequestDoc) return;
+    setSendingAdminRequest(true);
+    try {
+      await updateDoc(doc(db, "adminRequests", adminRequestDoc.id), {
+        status: "cancelled",
+        cancelledAt: new Date(),
+      });
+      setAdminRequestPending(false);
+      setAdminRequestDoc(null);
+      setMessage("admin", "success", "Admin request cancelled.");
+    } catch (err) {
+      console.error("Failed to cancel admin request:", err);
+      setMessage("admin", "error", "Failed to cancel admin request.");
+    } finally {
+      setSendingAdminRequest(false);
     }
   };
 
@@ -588,6 +664,29 @@ const UserDashboard = () => {
             </svg>
             Browse Available Groups
           </button>
+
+          {/* Request Admin Role */}
+          {userRole !== "admin" && (
+            <div style={{ minWidth: "180px" }}>
+              {adminRequestPending ? (
+                <button
+                  className="btn btn-danger"
+                  onClick={handleCancelAdminRequest}
+                  disabled={sendingAdminRequest}
+                >
+                  {sendingAdminRequest ? "Cancelling..." : "Cancel Admin Request"}
+                </button>
+              ) : (
+                <button
+                  className="btn btn-outline"
+                  onClick={handleRequestAdmin}
+                  disabled={sendingAdminRequest}
+                >
+                  {sendingAdminRequest ? "Sending..." : "Request Admin Role"}
+                </button>
+              )}
+            </div>
+          )}
 
           {/* ── Notification bell — fixed badge ── */}
           <div style={{ position: "relative", display: "inline-block" }}>

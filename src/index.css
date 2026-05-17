@@ -118,6 +118,43 @@ a:hover { text-decoration: underline; }
 }
 .btn-danger:hover { background: #b91c1c; }
 
+/* Base button utilities - used across components */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: var(--transition);
+  border: none;
+  text-decoration: none;
+  font-family: inherit;
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1.25px solid var(--blue);
+  color: var(--blue);
+  padding: 0.5rem 1rem;
+}
+.btn-outline:hover { border-color: var(--blue-dark); color: #fff; background: var(--blue); transform: translateY(-1px); box-shadow: var(--shadow); }
+
+.btn-success {
+  background: var(--success);
+  color: white;
+  border: none;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+}
+.btn-success:hover { background: #15803d; }
+
+.btn-sm { padding: 0.35rem 0.6rem; font-size: 0.82rem; }
+
+.btn[disabled], .btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+
 
 
 .auth-divider {
