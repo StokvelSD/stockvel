@@ -16,8 +16,12 @@ vi.mock('react-router-dom', async () => {
 vi.mock('../firebase/firebase', () => ({ auth: {}, db: {} }))
 
 const mockLogin = vi.fn()
+const mockSignInWithGoogle = vi.fn()
 vi.mock('../contexts/AuthContext', () => ({
-  useAuth: () => ({ login: mockLogin }),
+  useAuth: () => ({ 
+    login: mockLogin,
+    signInWithGoogle: mockSignInWithGoogle,
+  }),
 }))
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -37,10 +41,6 @@ const fillAndSubmit = (email = 'user@test.com', password = 'password123') => {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Login Page — rendering', () => {
-
-  // Given the login page loads,
-  // When the component renders,
-  // Then the welcome heading is visible.
   it('renders the welcome heading', () => {
     renderPage()
     expect(screen.getByText('Welcome back')).toBeInTheDocument()
@@ -68,9 +68,11 @@ describe('Login Page — rendering', () => {
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
   })
 
-  // Given the footer link renders,
-  // When a user has no account,
-  // Then the Create one link points to /register.
+  it('renders the Google sign-in button', () => {
+    renderPage()
+    expect(screen.getByText('Continue with Google')).toBeInTheDocument()
+  })
+
   it('renders the Create one link pointing to /register', () => {
     renderPage()
     const link = screen.getByRole('link', { name: /create one/i })
@@ -78,20 +80,19 @@ describe('Login Page — rendering', () => {
     expect(link).toHaveAttribute('href', '/register')
   })
 
-  // Given the form renders,
-  // When no submission has been attempted,
-  // Then no error message is visible.
   it('shows no error message on initial render', () => {
     renderPage()
     expect(screen.queryByText(/invalid email or password/i)).not.toBeInTheDocument()
   })
+
+  it('renders the logo SVG', () => {
+    renderPage()
+    const svg = document.querySelector('svg')
+    expect(svg).toBeInTheDocument()
+  })
 })
 
 describe('Login Page — form interaction', () => {
-
-  // Given the email input is present,
-  // When the user types in it,
-  // Then the input value updates.
   it('updates email input value when typed', () => {
     renderPage()
     const input = screen.getByPlaceholderText('you@example.com')
@@ -99,9 +100,6 @@ describe('Login Page — form interaction', () => {
     expect(input.value).toBe('alice@stokvel.co.za')
   })
 
-  // Given the password input is present,
-  // When the user types in it,
-  // Then the input value updates.
   it('updates password input value when typed', () => {
     renderPage()
     const input = screen.getByPlaceholderText('••••••••')
@@ -109,22 +107,53 @@ describe('Login Page — form interaction', () => {
     expect(input.value).toBe('securepass')
   })
 
-  // Given the password field renders,
-  // When inspecting its type,
-  // Then it is type="password" so the value is masked.
   it('masks the password input', () => {
     renderPage()
     expect(screen.getByPlaceholderText('••••••••')).toHaveAttribute('type', 'password')
   })
+
+  it('email input has required attribute', () => {
+    renderPage()
+    expect(screen.getByPlaceholderText('you@example.com')).toHaveAttribute('required')
+  })
+
+  it('password input has required attribute', () => {
+    renderPage()
+    expect(screen.getByPlaceholderText('••••••••')).toHaveAttribute('required')
+  })
+})
+
+describe('Login Page — form submission', () => {
+  beforeEach(() => {
+    mockLogin.mockReset()
+    mockSignInWithGoogle.mockReset()
+  })
+
+  it('calls login with email and password on form submit', async () => {
+    mockLogin.mockResolvedValue('user')
+    renderPage()
+    fillAndSubmit('test@example.com', 'mypassword123')
+    
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'mypassword123')
+    })
+  })
+
+  it('prevents submission when fields are empty', async () => {
+    renderPage()
+    const submitBtn = screen.getByRole('button', { name: /sign in/i })
+    fireEvent.click(submitBtn)
+    
+    expect(mockLogin).not.toHaveBeenCalled()
+  })
 })
 
 describe('Login Page — navigation after login', () => {
+  beforeEach(() => {
+    mockLogin.mockReset()
+    mockSignInWithGoogle.mockReset()
+  })
 
-  beforeEach(() => mockLogin.mockReset())
-
-  // Given valid admin credentials,
-  // When the form is submitted,
-  // Then the user is navigated to /admin.
   it('navigates to /admin when role is admin', async () => {
     mockLogin.mockResolvedValue('admin')
     renderPage()
@@ -132,9 +161,6 @@ describe('Login Page — navigation after login', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/admin'))
   })
 
-  // Given valid treasurer credentials,
-  // When the form is submitted,
-  // Then the user is navigated to /treasurer.
   it('navigates to /treasurer when role is treasurer', async () => {
     mockLogin.mockResolvedValue('treasurer')
     renderPage()
@@ -142,9 +168,6 @@ describe('Login Page — navigation after login', () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/treasurer'))
   })
 
-  // Given valid standard user credentials,
-  // When the form is submitted,
-  // Then the user is navigated to /dashboard.
   it('navigates to /dashboard for standard user role', async () => {
     mockLogin.mockResolvedValue('user')
     renderPage()
@@ -153,25 +176,162 @@ describe('Login Page — navigation after login', () => {
   })
 })
 
+describe('Login Page — Google Sign-In', () => {
+  beforeEach(() => {
+    mockLogin.mockReset()
+    mockSignInWithGoogle.mockReset()
+  })
+
+  it('calls signInWithGoogle when Google button is clicked', async () => {
+    mockSignInWithGoogle.mockResolvedValue('user')
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    
+    await waitFor(() => {
+      expect(mockSignInWithGoogle).toHaveBeenCalled()
+    })
+  })
+
+  it('navigates to /admin after Google sign-in with admin role', async () => {
+    mockSignInWithGoogle.mockResolvedValue('admin')
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/admin')
+    })
+  })
+
+  it('navigates to /treasurer after Google sign-in with treasurer role', async () => {
+    mockSignInWithGoogle.mockResolvedValue('treasurer')
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/treasurer')
+    })
+  })
+
+  it('navigates to /dashboard after Google sign-in with user role', async () => {
+    mockSignInWithGoogle.mockResolvedValue('user')
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
+    })
+  })
+
+  it('shows error message when Google sign-in fails', async () => {
+    mockSignInWithGoogle.mockRejectedValue(new Error('Google auth failed'))
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    
+    await waitFor(() => {
+      expect(screen.getByText('Google sign-in failed. Please try again.')).toBeInTheDocument()
+    })
+  })
+})
+
 describe('Login Page — error handling', () => {
+  beforeEach(() => {
+    mockLogin.mockReset()
+    mockSignInWithGoogle.mockReset()
+  })
 
-  beforeEach(() => mockLogin.mockReset())
+  it('shows error message when login fails with invalid credentials', async () => {
+    mockLogin.mockRejectedValue(new Error('Invalid credentials'))
+    renderPage()
+    fillAndSubmit()
+    
+    await waitFor(() => {
+      expect(screen.getByText('Invalid email or password. Please try again.')).toBeInTheDocument()
+    })
+  })
 
-  // Given invalid credentials are submitted,
-  // When the login function throws,
-  // Then an error message is displayed.
- 
-  // Given the form is submitted,
-  // When the login call is in progress,
-  // Then the button shows Signing in… and is disabled.
   it('disables button and shows Signing in… while loading', async () => {
-    mockLogin.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve('user'), 200))
-    )
+    mockLogin.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('user'), 200)))
     renderPage()
     fillAndSubmit()
     const btn = screen.getByRole('button', { name: /signing in/i })
     expect(btn).toBeDisabled()
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled())
+  })
+
+  it('disables Google button while loading', async () => {
+    mockSignInWithGoogle.mockImplementation(() => new Promise(() => {}))
+    renderPage()
+    const googleBtn = screen.getByText('Continue with Google')
+    fireEvent.click(googleBtn)
+    expect(googleBtn).toBeDisabled()
+  })
+
+  it('clears error message on new submission attempt', async () => {
+    mockLogin.mockRejectedValueOnce(new Error('First fail'))
+    renderPage()
+    fillAndSubmit()
+    
+    await waitFor(() => {
+      expect(screen.getByText('Invalid email or password. Please try again.')).toBeInTheDocument()
+    })
+    
+    mockLogin.mockResolvedValue('user')
+    fillAndSubmit()
+    
+    await waitFor(() => {
+      expect(screen.queryByText('Invalid email or password. Please try again.')).not.toBeInTheDocument()
+    })
+  })
+})
+
+describe('Login Page — edge cases', () => {
+  beforeEach(() => {
+    mockLogin.mockReset()
+    mockSignInWithGoogle.mockReset()
+  })
+
+  it('handles email with special characters', async () => {
+    mockLogin.mockResolvedValue('user')
+    renderPage()
+    fillAndSubmit('test+special@example.com', 'password')
+    
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('test+special@example.com', 'password')
+    })
+  })
+
+  it('handles very long email', async () => {
+    mockLogin.mockResolvedValue('user')
+    renderPage()
+    const longEmail = 'a'.repeat(100) + '@example.com'
+    fillAndSubmit(longEmail, 'password')
+    
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith(longEmail, 'password')
+    })
+  })
+
+  it('handles empty email submission properly', async () => {
+    renderPage()
+    const submitBtn = screen.getByRole('button', { name: /sign in/i })
+    fireEvent.click(submitBtn)
+    
+    expect(mockLogin).not.toHaveBeenCalled()
+  })
+
+  it('handles empty password submission properly', async () => {
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText('you@example.com'), {
+      target: { value: 'test@example.com' },
+    })
+    const submitBtn = screen.getByRole('button', { name: /sign in/i })
+    fireEvent.click(submitBtn)
+    
+    expect(mockLogin).not.toHaveBeenCalled()
   })
 })

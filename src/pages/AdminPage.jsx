@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { useNavigate } from 'react-router-dom';
 import '../index.css';
@@ -127,9 +127,6 @@ function AdminPage() {
   const [activeTab, setActiveTab]           = useState('users');
   const [contributions, setContributions]   = useState([]);
   const [groups, setGroups]                 = useState([]);
-  const [adminRequests, setAdminRequests]   = useState([]);
-  const [showAdminRequests, setShowAdminRequests] = useState(false);
-  const [processingRequestId, setProcessingRequestId] = useState(null);
   const [reportsLoading, setReportsLoading] = useState(false);
   const [filterStatus, setFilterStatus]     = useState('all');
   const [filterGroup, setFilterGroup]       = useState('all');
@@ -142,27 +139,13 @@ function AdminPage() {
       try {
         const snap = await getDocs(collection(db, 'users'));
         setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        // fetch admin requests
-        const q = query(collection(db, 'adminRequests'), where('status', '==', 'pending'));
-        const reqSnap = await getDocs(q);
-        setAdminRequests(reqSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (err) {
-        console.error('Failed to fetch users or admin requests:', err);
+        console.error('Failed to fetch users:', err);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
-
-  const fetchAdminRequests = async () => {
-    try {
-      const q = query(collection(db, 'adminRequests'), where('status', '==', 'pending'));
-      const snap = await getDocs(q);
-      setAdminRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error('Failed to fetch admin requests:', err);
-    }
-  };
 
   /* ── fetch reports data when tab opens ── */
   useEffect(() => {
@@ -244,84 +227,6 @@ function AdminPage() {
     user:      users.filter(u => u.role === 'user').length,
   };
 
-  if (showAdminRequests) {
-    return (
-      <div className="dashboard-page">
-        <div className="dashboard-inner">
-          <button className="back-btn" onClick={() => { setShowAdminRequests(false); fetchAdminRequests(); }} title="Back">←</button>
-
-          <h3>Admin Requests ({adminRequests.length})</h3>
-
-          {adminRequests.length === 0 && <p style={{ color: 'var(--text-muted)' }}>No pending admin requests.</p>}
-
-          {adminRequests.map((request) => {
-            const reqUser = users.find(u => u.id === request.userId) || {};
-            const requestedAt = fmtDate(request.requestedAt || request.requestedAt?.toDate?.());
-            const isProcessing = processingRequestId === request.id;
-            return (
-              <div key={request.id} style={{ border: '1px solid var(--border)', padding: '0.75rem', marginBottom: '0.75rem', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', background: 'white' }}>
-                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--blue-light)', color: 'var(--blue-dark)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.95rem' }}>
-                    {(request.userName || request.userEmail || '?')[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{request.userName || reqUser.name || '—'} <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '0.9rem' }}>({request.userEmail || reqUser.email || '—'})</span></div>
-                    {/* Do not display raw user/request IDs for privacy */}
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 4 }}>Requested: {requestedAt}</div>
-                    {reqUser.createdAt && <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: 4 }}>Joined: {fmtDate(reqUser.createdAt)}</div>}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button
-                    className="btn btn-primary"
-                    disabled={isProcessing}
-                    onClick={async () => {
-                      setProcessingRequestId(request.id);
-                      try {
-                        await updateDoc(doc(db, 'users', request.userId), { role: 'admin' });
-                        await updateDoc(doc(db, 'adminRequests', request.id), { status: 'approved', acceptedAt: new Date() });
-                        const snap = await getDocs(collection(db, 'users'));
-                        setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-                        await fetchAdminRequests();
-                      } catch (err) {
-                        console.error('Failed to approve admin request:', err);
-                        alert('Failed to approve request');
-                      } finally {
-                        setProcessingRequestId(null);
-                      }
-                    }}
-                  >
-                    {isProcessing ? 'Processing...' : 'Approve'}
-                  </button>
-
-                  <button
-                    className="btn btn-danger"
-                    disabled={isProcessing}
-                    onClick={async () => {
-                      setProcessingRequestId(request.id);
-                      try {
-                        await updateDoc(doc(db, 'adminRequests', request.id), { status: 'declined', declinedAt: new Date() });
-                        await fetchAdminRequests();
-                      } catch (err) {
-                        console.error('Failed to decline admin request:', err);
-                        alert('Failed to decline request');
-                      } finally {
-                        setProcessingRequestId(null);
-                      }
-                    }}
-                  >
-                    {isProcessing ? 'Processing...' : 'Decline'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
   /* ── shared styles ── */
   const tabBtn = (id) => ({
     padding: '0.55rem 1.2rem',
@@ -390,12 +295,6 @@ function AdminPage() {
             Create group
           </button>
           <button className="btn btn-outline" onClick={() => navigate('/configure-group')}>Configure group</button>
-          <button className="btn btn-outline" onClick={() => { setShowAdminRequests(true); }} style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-            Admin Requests
-            {adminRequests.length > 0 && (
-              <span style={{ background: '#dc2626', color: '#fff', fontSize: '0.75rem', fontWeight: 700, minWidth: 22, height: 22, borderRadius: 9999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>{adminRequests.length > 99 ? '99+' : adminRequests.length}</span>
-            )}
-          </button>
         </div>
 
         {/* tab bar */}

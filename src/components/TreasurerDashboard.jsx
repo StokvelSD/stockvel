@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, getDocs, getDoc, doc, query, where } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, query, where, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { initiatePayout } from './initiatePayout';
 import '../index.css';
 
 const isPaidOrCompleted = (status) => ['paid', 'completed', 'confirmed'].includes((status || '').toLowerCase());
@@ -18,6 +18,7 @@ export default function TreasurerDashboard() {
   const [myGroups, setMyGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState(null);
   const [loadingGroups, setLoadingGroups] = useState(true);
+
   const [tableData, setTableData] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [loadingDashboard, setLoadingDashboard] = useState(false);
@@ -31,7 +32,6 @@ export default function TreasurerDashboard() {
   const [payoutHistory, setPayoutHistory] = useState([]);
   const [payoutProjections, setPayoutProjections] = useState([]);
   const [currentCycle, setCurrentCycle] = useState(1);
-  const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
     if (!user) return;
@@ -59,9 +59,14 @@ export default function TreasurerDashboard() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const groupIds = userDoc.data()?.groups || [];
       if (groupIds.length === 0) { setLoadingGroups(false); return; }
+
       const groupDocs = await Promise.all(groupIds.map(id => getDoc(doc(db, 'groups', id))));
-      const groups = groupDocs.filter(d => d.exists()).map(d => ({ id: d.id, ...d.data() }));
+      const groups = groupDocs
+        .filter(d => d.exists())
+        .map(d => ({ id: d.id, ...d.data() }));
+
       setMyGroups(groups);
+
       if (groups.length === 1) setSelectedGroupId(groups[0].id);
     } catch (e) {
       console.error(e);
@@ -76,7 +81,6 @@ export default function TreasurerDashboard() {
     setPayoutHistory([]);
     setPayoutProjections([]);
     setNextRecipient(null);
-    setChartData([]);
     try {
       const groupDoc = await getDoc(doc(db, 'groups', gId));
       const groupData = groupDoc.data();
@@ -118,17 +122,6 @@ export default function TreasurerDashboard() {
       setTableData(joined);
       setNextRecipient(orderedMembers.find(m => !paidOutIdsThisCycle.includes(m.id)) || null);
 
-      const generatedChartData = orderedMembers.map(member => {
-        const payment = currentCyclePayments.find(p => p.userId === member.id);
-        const payout = allSuccessPayouts.find(p => p.userId === member.id);
-        return {
-          name: member.name || member.email?.split('@')[0],
-          Contributed: payment?.amount ? Number(payment.amount) : 0,
-          'Paid Out': payout?.amount ? Number(payout.amount) : 0,
-        };
-      });
-      setChartData(generatedChartData);
-
       const frequency = groupData.meetingFrequency?.toLowerCase() || 'monthly';
       const cycleStartDate = groupData.cycleStartDate?.toDate
         ? groupData.cycleStartDate.toDate()
@@ -159,6 +152,17 @@ export default function TreasurerDashboard() {
       console.error(e);
     } finally {
       setLoadingDashboard(false);
+    }
+  };
+
+  const flagAsMissed = async (member) => {
+    if (!member.paymentId) { alert("Cannot flag: No payment record found."); return; }
+    try {
+      await updateDoc(doc(db, 'payments', member.paymentId), { status: 'missed' });
+      alert(`${member.name || member.email} has been flagged for a missed contribution.`);
+      fetchDashboardData(selectedGroupId);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -200,20 +204,7 @@ export default function TreasurerDashboard() {
     if (!nextRecipient) return;
     setError(''); setSuccess(''); setPayoutLoading(true);
     try {
-      const response = await fetch('https://stockvel-2kvp.onrender.com/api/payouts/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupId: selectedGroupId,
-          groupName,
-          recipientId: nextRecipient.id,
-          recipientName: nextRecipient.name,
-          recipientEmail: nextRecipient.email,
-          amount: parseFloat(expectedPot.toFixed(2)),
-          initiatedBy: user.uid,
-        })
-      });
-      if (!response.ok) throw new Error('Payout failed');
+      await initiatePayout({ groupId: selectedGroupId, amount: parseFloat(expectedPot.toFixed(2)) });
       setSuccess("Payout initiated successfully");
       setTimeout(() => { setShowPayoutModal(false); fetchDashboardData(selectedGroupId); }, 2000);
     } catch (err) {
@@ -223,153 +214,139 @@ export default function TreasurerDashboard() {
     }
   };
 
-  if (loadingGroups) return (
-    <section className="loading-screen">
-      <output className="spinner" />
-      <h3>Loading your groups…</h3>
-    </section>
-  );
+  if (loadingGroups) return <div className="loading-screen"><div className="spinner" /><h3>Loading your groups…</h3></div>;
 
   if (!selectedGroupId) {
     return (
-      <main className="treasurer-page">
-        <header className="dashboard-header">
+      <div className="treasurer-page">
+        <div className="dashboard-header">
           <h2>Treasurer Dashboard</h2>
           <p>Select a group to manage</p>
-        </header>
+        </div>
         {myGroups.length === 0 ? (
-          <p style={{ color: 'var(--text-muted)' }}>You are not assigned as treasurer to any group.</p>
+          <p style={{ color: '#64748b' }}>You are not assigned as treasurer to any group.</p>
         ) : (
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
             {myGroups.map(group => (
-              <article
+              <div
                 key={group.id}
                 onClick={() => setSelectedGroupId(group.id)}
-                className="dashboard-card"
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow)'}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = 'var(--shadow-sm)'}
+                style={{
+                  padding: '1.5rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.2s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'}
+                onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
               >
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
-                  <strong style={{
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '1rem' }}>
+                  <div style={{
                     width: '48px', height: '48px', borderRadius: '50%',
-                    backgroundColor: 'var(--blue-dark)', color: 'white',
+                    backgroundColor: '#1e4a2a', color: 'white',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontWeight: 700, fontSize: '1.2rem'
                   }}>
                     {(group.groupName || group.name || '?')[0].toUpperCase()}
-                  </strong>
-                  <mark className="badge badge-info">Cycle {group.currentCycle || 1}</mark>
-                </header>
-                <p style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.25rem', color: 'var(--text)' }}>
+                  </div>
+                  <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: '12px', backgroundColor: '#f0fdf4', color: '#15803d', fontWeight: 600 }}>
+                    Cycle {group.currentCycle || 1}
+                  </span>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.25rem' }}>
                   {group.groupName || group.name}
-                </p>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                </div>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '0.75rem' }}>
                   {group.members?.length || 0} members · R{group.contributionAmount}/month
-                </p>
-                <p style={{ fontSize: '0.8rem', color: 'var(--blue)', fontWeight: 600 }}>Manage →</p>
-              </article>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#15803d', fontWeight: 600 }}>
+                  Manage →
+                </div>
+              </div>
             ))}
-          </section>
+          </div>
         )}
-      </main>
+      </div>
     );
   }
 
-  if (loadingDashboard) return (
-    <section className="loading-screen">
-      <output className="spinner" />
-      <h3>Syncing ledger…</h3>
-    </section>
-  );
+  if (loadingDashboard) return <div className="loading-screen"><div className="spinner" /><h3>Syncing ledger…</h3></div>;
 
   return (
-    <main className="treasurer-page">
-      <header className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem' }}>
-        <section>
+    <div className="treasurer-page">
+      <div className="dashboard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
           <h2>Treasurer Dashboard</h2>
-          <p>Managing: <strong>{groupName}</strong> — <mark className="badge badge-info">Cycle {currentCycle}</mark></p>
-        </section>
+          <p>Managing: <strong>{groupName}</strong> — <span style={{ color: '#15803d' }}>Cycle {currentCycle}</span></p>
+        </div>
         {myGroups.length > 1 && (
-          <button className="btn-ghost" onClick={() => setSelectedGroupId(null)} style={{ fontSize: '0.85rem' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setSelectedGroupId(null)}
+            style={{ fontSize: '0.85rem' }}
+          >
             ← Switch Group
           </button>
         )}
-      </header>
+      </div>
 
-      <section className="stats-grid">
-        <article className="stat-card">
-          <p className="stat-label">Total Collected</p>
-          <p className="stat-value">R {totalCollected.toLocaleString()}</p>
-          <p className="stat-sub">cycle {currentCycle} payments</p>
-        </article>
-        <article className="stat-card">
-          <p className="stat-label">Compliance Rate</p>
-          <p className="stat-value">{complianceRate}%</p>
-          <p className="stat-sub">contribution compliance</p>
-        </article>
-        <article className="stat-card">
-          <p className="stat-label">Next Payout</p>
-          <p className="stat-value" style={{ color: 'var(--success)' }}>R {expectedPot.toFixed(2)}</p>
-          <p className="stat-sub">Includes R{accruedInterest.toFixed(2)} interest</p>
-        </article>
-      </section>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Total Collected</div>
+          <div className="stat-value">R {totalCollected.toLocaleString()}</div>
+          <div className="stat-sub">cycle {currentCycle} payments</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Compliance Rate</div>
+          <div className="stat-value">{complianceRate}%</div>
+          <div className="stat-sub">contribution compliance</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Next Payout</div>
+          <div className="stat-value" style={{ color: '#15803d' }}>R {expectedPot.toFixed(2)}</div>
+          <div className="stat-sub" style={{ color: '#166534' }}>Includes R{accruedInterest.toFixed(2)} interest</div>
+        </div>
+      </div>
 
-      <nav style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
         <button className="btn-primary" onClick={() => setShowPayoutModal(true)}>Record Payout</button>
         <button className="btn-ghost" onClick={downloadCSV}>Export Report (CSV)</button>
-      </nav>
+      </div>
 
       {showPayoutModal && (
-        <section className="finance-panel">
+        <div className="finance-panel">
           <h3>Initiate Rotation Payout — Cycle {currentCycle}</h3>
           {expectedPot > totalCollected && (
-            <p style={{ backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', padding: '0.75rem', borderRadius: 'var(--radius)', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid var(--danger)' }}>
-              <strong>⚠️ Insufficient Funds Warning:</strong> Expected payout (R{expectedPot.toFixed(2)}) is greater than total collected (R{totalCollected}).
-            </p>
+            <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', padding: '0.75rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem', border: '1px solid #f87171' }}>
+              <strong>⚠️ Insufficient Funds Warning:</strong><br />
+              Expected payout (R{expectedPot.toFixed(2)}) is greater than total collected (R{totalCollected}).
+            </div>
           )}
           {nextRecipient ? (
-            <article>
+            <>
               <p>Next in rotation: <strong>{nextRecipient.name || nextRecipient.email}</strong></p>
               <p style={{ fontSize: '1.2rem', margin: '0.5rem 0' }}>Amount to disburse: <strong>R {expectedPot.toFixed(2)}</strong></p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Base pot R{basePotAmount} + R{accruedInterest.toFixed(2)} interest.</p>
-              <footer style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Base pot R{basePotAmount} + R{accruedInterest.toFixed(2)} interest.</p>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
                 <button className="btn-primary" onClick={handleInitiatePayout} disabled={payoutLoading}>
                   {payoutLoading ? "Processing..." : "Confirm Payout"}
                 </button>
                 <button className="btn-ghost" onClick={() => setShowPayoutModal(false)}>Cancel</button>
-              </footer>
-              {error && <p style={{ color: 'var(--danger)', marginTop: '0.5rem' }}>{error}</p>}
-              {success && <p style={{ color: 'var(--success)', marginTop: '0.5rem' }}>{success}</p>}
-            </article>
+              </div>
+              {error && <p style={{ color: "red", marginTop: '0.5rem' }}>{error}</p>}
+              {success && <p style={{ color: "green", marginTop: '0.5rem' }}>{success}</p>}
+            </>
           ) : (
             <p>All members have been paid out this cycle. <button className="btn-ghost" onClick={() => setShowPayoutModal(false)}>Close</button></p>
           )}
-        </section>
+        </div>
       )}
 
-      {chartData.length > 0 && (
-        <section className="dashboard-card" style={{ marginBottom: '2rem' }}>
-          <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-            Contributions vs Payouts — Cycle {currentCycle}
-          </h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-              <YAxis tickFormatter={(v) => `R${v}`} tick={{ fontSize: 12, fill: 'var(--text-muted)' }} />
-              <Tooltip formatter={(value) => `R${value}`} />
-              <Legend />
-              <Bar dataKey="Contributed" fill="var(--blue)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Paid Out" fill="var(--success)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </section>
-      )}
-
-      <section className="dashboard-card" style={{ marginBottom: '2rem' }}>
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
         <h3>Member Ledger — Cycle {currentCycle}</h3>
-        <section className="table-wrap">
+        <div className="table-wrap">
           <table>
             <thead>
               <tr>
@@ -377,6 +354,7 @@ export default function TreasurerDashboard() {
                 <th>Amount</th>
                 <th>Status</th>
                 <th>Payout</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -385,95 +363,99 @@ export default function TreasurerDashboard() {
                   <td><strong>{member.name || member.email}</strong></td>
                   <td>{member.amount ? `R${member.amount}` : '—'}</td>
                   <td>
-                    <mark className={`badge ${isPaidOrCompleted(member.status) ? 'badge-success' : member.status === 'missed' ? 'badge-danger' : 'badge-warning'}`}>
+                    <span className={`badge ${isPaidOrCompleted(member.status) ? 'badge-success' : member.status === 'missed' ? 'badge-danger' : 'badge-warning'}`}>
                       {member.status.toUpperCase()}
-                    </mark>
+                    </span>
                   </td>
                   <td>
-                    <mark className={`badge ${member.isPaidOut ? 'badge-success' : 'badge-pending'}`}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: member.isPaidOut ? '#166534' : '#475569' }}>
                       {member.isPaidOut ? 'DISBURSED' : 'WAITING'}
-                    </mark>
+                    </span>
+                  </td>
+                  <td>
+                    {!isPaidOrCompleted(member.status) && member.status !== 'missed' && (
+                      <button className="btn-ghost" style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', color: '#dc2626' }} onClick={() => flagAsMissed(member)}>
+                        Flag Missed
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </section>
-      </section>
+        </div>
+      </div>
 
-      <section className="dashboard-card" style={{ marginBottom: '2rem' }}>
-        <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+      <div className="dashboard-card" style={{ marginBottom: '2rem' }}>
+        <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>
           Full Payout Schedule — Cycle {currentCycle}
         </h3>
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
           {payoutProjections.map((projection) => {
             const alreadyPaid = payoutHistory.find(p =>
               (p.userId === projection.memberId || p.memberId === projection.memberId) && p.cycleId === currentCycle
             );
             return (
-              <article key={projection.memberId} style={{
+              <div key={projection.memberId} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.75rem 1rem', borderRadius: 'var(--radius)',
-                border: '1px solid var(--border)', backgroundColor: 'var(--surface)'
+                padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', backgroundColor: 'white'
               }}>
-                <section style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <strong style={{
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{
                     width: '28px', height: '28px', borderRadius: '50%',
-                    backgroundColor: alreadyPaid ? 'var(--blue)' : 'var(--border)',
-                    color: alreadyPaid ? 'white' : 'var(--text-muted)',
+                    backgroundColor: alreadyPaid ? '#2c6e2f' : '#e2e8f0',
+                    color: alreadyPaid ? 'white' : '#64748b',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontWeight: 700, fontSize: '0.8rem'
                   }}>
                     {projection.position}
-                  </strong>
-                  <section>
-                    <p style={{ fontWeight: 600, color: 'var(--text)', margin: 0 }}>{projection.memberName}</p>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{projection.memberName}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
                       {projection.payoutDate.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </section>
-                </section>
-                <section style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <section style={{ textAlign: 'right' }}>
-                    <p style={{ fontWeight: 600, color: 'var(--blue-dark)', margin: 0 }}>R {projection.amount.toFixed(2)}</p>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>includes R{projection.growth.toFixed(2)} interest</p>
-                  </section>
-                  <mark className={`badge ${alreadyPaid ? 'badge-success' : 'badge-warning'}`}>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {projection.amount.toFixed(2)}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#15803d' }}>includes R{projection.growth.toFixed(2)} interest</div>
+                  </div>
+                  <span className={`badge ${alreadyPaid ? 'badge-success' : 'badge-warning'}`}>
                     {alreadyPaid ? 'PAID OUT' : 'UPCOMING'}
-                  </mark>
-                </section>
-              </article>
+                  </span>
+                </div>
+              </div>
             );
           })}
-        </section>
-      </section>
+        </div>
+      </div>
 
       {payoutHistory.length > 0 && (
-        <section className="dashboard-card">
-          <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
-            Payout History (All Cycles)
-          </h3>
-          <section style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+        <div className="dashboard-card">
+          <h3 style={{ textTransform: 'uppercase', fontSize: '0.9rem', letterSpacing: '0.05em', color: '#64748b' }}>Payout History (All Cycles)</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
             {payoutHistory.map(payout => (
-              <article key={payout.id} style={{
+              <div key={payout.id} style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius)'
+                padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '8px'
               }}>
-                <section>
-                  <p style={{ fontWeight: 600, color: 'var(--text)', margin: 0 }}>{payout.userName || payout.memberId}</p>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                <div>
+                  <div style={{ fontWeight: 600 }}>{payout.userName || payout.memberId}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     Cycle {payout.cycleId} · {payout.createdAt?.toDate?.().toLocaleDateString('en-ZA')}
-                  </p>
-                </section>
-                <section style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <p style={{ fontWeight: 600, color: 'var(--blue-dark)', margin: 0 }}>R {payout.amount}</p>
-                  <mark className="badge badge-success">DISBURSED</mark>
-                </section>
-              </article>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <div style={{ fontWeight: 600, color: '#2c6e2f' }}>R {payout.amount}</div>
+                  <span className="badge badge-success">DISBURSED</span>
+                </div>
+              </div>
             ))}
-          </section>
-        </section>
+          </div>
+        </div>
       )}
-    </main>
+    </div>
   );
 }

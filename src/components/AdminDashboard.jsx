@@ -25,8 +25,6 @@ function AdminPage() {
   const [search, setSearch] = useState("");
   const [groups, setGroups] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
-  const [adminRequests, setAdminRequests] = useState([]);
-  const [showAdminRequests, setShowAdminRequests] = useState(false);
   const [showJoinRequests, setShowJoinRequests] = useState(false);
   const [showBrowseGroups, setShowBrowseGroups] = useState(false);
   const [showAddParticipant, setShowAddParticipant] = useState(false);
@@ -40,7 +38,6 @@ function AdminPage() {
     fetchUsers();
     fetchGroups();
     fetchJoinRequests();
-    fetchAdminRequests();
   }, []);
 
   const fetchUsers = async () => {
@@ -85,20 +82,6 @@ function AdminPage() {
     }
   };
 
-  const fetchAdminRequests = async () => {
-    try {
-      const q = query(
-        collection(db, "adminRequests"),
-        where("status", "==", "pending"),
-      );
-      const snap = await getDocs(q);
-      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setAdminRequests(data);
-    } catch (err) {
-      console.error("Failed to fetch admin requests:", err);
-    }
-  };
-
   const handleRoleChange = async (userId, newRole) => {
     setUpdating(userId);
     try {
@@ -139,7 +122,7 @@ function AdminPage() {
     return (
       <div className="dashboard-page">
         <div className="dashboard-inner">
-          <button className="back-btn" onClick={() => setShowAddParticipant(false)} title="Back">←</button>
+          <button onClick={() => setShowAddParticipant(false)}>Back</button>
 
           <h3>Add Participant to {selectedGroup?.groupName}</h3>
 
@@ -170,7 +153,7 @@ function AdminPage() {
     return (
       <div className="dashboard-page">
         <div className="dashboard-inner">
-          <button className="back-btn" onClick={() => setShowJoinRequests(false)} title="Back">←</button>
+          <button onClick={() => setShowJoinRequests(false)}>Back</button>
 
           <h3>Join Requests ({joinRequests.length})</h3>
 
@@ -208,65 +191,6 @@ function AdminPage() {
     );
   }
 
-  // Admin Requests View
-  if (showAdminRequests) {
-    return (
-      <div className="dashboard-page">
-        <div className="dashboard-inner">
-          <button className="back-btn" onClick={() => { setShowAdminRequests(false); fetchAdminRequests(); }} title="Back">←</button>
-
-          <h3>Admin Requests ({adminRequests.length})</h3>
-
-          {adminRequests.map((request) => (
-            <div key={request.id} style={{ border: '1px solid var(--border)', padding: '0.75rem', marginBottom: '0.5rem' }}>
-              <p>
-                {request.userName} ({request.userEmail})
-              </p>
-
-              <button
-                onClick={async () => {
-                  try {
-                    // grant admin role
-                    await updateDoc(doc(db, "users", request.userId), { role: "admin" });
-                    await updateDoc(doc(db, "adminRequests", request.id), {
-                      status: "approved",
-                      acceptedAt: new Date(),
-                    });
-                    await fetchUsers();
-                    await fetchAdminRequests();
-                    alert(`Granted admin to ${request.userName}`);
-                  } catch (err) {
-                    console.error("Failed to approve admin request:", err);
-                    alert("Failed to approve request");
-                  }
-                }}
-              >
-                Approve
-              </button>
-
-              <button
-                onClick={async () => {
-                  try {
-                    await updateDoc(doc(db, "adminRequests", request.id), {
-                      status: "declined",
-                      declinedAt: new Date(),
-                    });
-                    await fetchAdminRequests();
-                  } catch (err) {
-                    console.error("Failed to decline admin request:", err);
-                    alert("Failed to decline request");
-                  }
-                }}
-              >
-                Decline
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   // Main Dashboard
   return (
     <div className="dashboard-page">
@@ -291,10 +215,6 @@ function AdminPage() {
 
           <button onClick={() => setShowJoinRequests(true)}>
             Join Requests ({joinRequests.length})
-          </button>
-
-          <button onClick={() => setShowAdminRequests(true)}>
-            Admin Requests ({adminRequests.length})
           </button>
 
           <button onClick={() => setShowConfigureGroup(true)}>
