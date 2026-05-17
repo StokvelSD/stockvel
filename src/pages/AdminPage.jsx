@@ -173,7 +173,7 @@ function AdminPage() {
     fetchUsers();
     fetchRoleRequests();
     })();
-  }, []);
+  }), []);
 
   /* ── fetch reports data when tab opens ── */
   useEffect(() => {
