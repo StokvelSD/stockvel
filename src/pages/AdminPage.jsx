@@ -154,7 +154,7 @@ function AdminPage() {
       } finally {
         setLoading(false);
       }
-    };
+    });
 
     const fetchRoleRequests = async () => {
       try {
