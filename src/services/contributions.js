@@ -23,17 +23,23 @@ export const fetchAllUserPayments = async () => {
 };
 
 export const fetchTotalPaid = async () => {
-  const token = await getToken();
+  try{
+    const token = await getToken();
+    console.log("Token found:", token ? "Yes" : "No"); 
 
-  const res = await fetch(`${API_BASE_URL}/contributions/user/total`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    }
-  });
+    const res = await fetch(`${API_BASE_URL}/contributions/user/total`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      }
+    });
 
-  if (!res.ok) throw new Error("Failed to fetch total paid contributions");
+    if (!res.ok) throw new Error("Failed to fetch total paid contributions");
 
-  return await res.json();
+    return await res.json();
+  } catch (error) {
+    console.error("fetchTotalPaid:", error);
+    throw error;
+  }
 };
 
 export const fetchContributionsByGroup = async () => {

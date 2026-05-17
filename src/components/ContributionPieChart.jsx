@@ -42,7 +42,7 @@ const ContributionPieChart = () => {
   return (
     <section className="section-card" style={{ marginBottom: "2rem" }}>
       <header>
-        <h3>🥧 Contribution Distribution by Group</h3>
+        <h3>Contribution Distribution by Group</h3>
       </header>
       
       <figure style={{ display: "flex", flexWrap: "wrap", gap: "20px", alignItems: "center", margin: 0 }}>

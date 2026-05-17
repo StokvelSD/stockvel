@@ -17,6 +17,8 @@ import SavingsProjection from "./SavingsProjection";
 import { fetchTotalPaid, fetchContributionsByGroup } from "../services/contributions";
 import ContributionPieChart from "../components/ContributionPieChart";
 import ExportButtons from "../components/ExportButtons";
+import ROICalculator from "./ROICalculator";
+import CustomView from "./CustomView";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -38,6 +40,9 @@ const UserDashboard = () => {
 
   const [upcomingPayments, setUpComingPayments] = useState([]);
   const [paymentHistory, setPaymentHistory] = useState([]);
+
+  const[customFilters, setCustomFilters] = useState({ groupId: "all", dateRange: "all" });  
+
 
   useEffect(() => {
     if (showBrowseGroups) {
@@ -124,6 +129,46 @@ const UserDashboard = () => {
     };
     loadRealContributionData();
   }, [user]);
+
+ const handleFilterChange = (filters) => {
+  setCustomFilters(prev => ({
+    ...prev,
+    ...filters
+  }));
+};
+
+  // Safe filter function with optional chaining
+const getFilteredPayments = () => {
+  // Ensure paymentHistory is an array
+  if (!paymentHistory || !Array.isArray(paymentHistory)) {
+    return [];
+  }
+  
+  let filtered = [...paymentHistory];
+  
+  // Filter by group - SAFE CHECK
+  if (customFilters.groupId && customFilters.groupId !== "all") {
+    filtered = filtered.filter(p => p?.groupId === customFilters.groupId);
+  }
+  
+  // Filter by date range - SAFE CHECK
+  if (customFilters.dateRange && customFilters.dateRange !== "all") {
+    const days = parseInt(customFilters.dateRange);
+    if (!isNaN(days)) {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - days);
+      filtered = filtered.filter(p => {
+        if (!p?.date) return false;
+        const paymentDate = new Date(p.date);
+        return !isNaN(paymentDate) && paymentDate >= cutoffDate;
+      });
+    }
+  }
+  
+  return filtered;
+};
+
+  const filteredPayments = getFilteredPayments();
 
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
@@ -632,11 +677,22 @@ const UserDashboard = () => {
         </section>
 
         <ContributionPieChart />
-        <ExportButtons
-          paymentHistory={paymentHistory}
+        <CustomView 
+          groupContributions={groupContributions}
+          onFilterChange={handleFilterChange}
+        />
+
+        {/* ROI Calculator */}
+        <ROICalculator 
           groupContributions={groupContributions}
           totalPaid={totalPaid}
         />
+        <ExportButtons
+          paymentHistory={filteredPayments}
+          groupContributions={groupContributions}
+          totalPaid={totalPaid}
+        />
+
       </section>
     </main>
   );
