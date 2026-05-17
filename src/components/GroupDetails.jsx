@@ -76,7 +76,7 @@ function GroupDetails() {
       }
     } catch (err) {
       console.error('SARB Fetch Error (using fallbacks):', err);
-      setSaRates({ repo: 8.25, prime: 11.75 });
+      setSaRates({ repo: 6.73, prime: 10.23 });
     }
   };
 

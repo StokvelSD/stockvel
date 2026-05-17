@@ -137,21 +137,19 @@ const UserDashboard = () => {
   }));
 };
 
-  // Safe filter function with optional chaining
+
 const getFilteredPayments = () => {
-  // Ensure paymentHistory is an array
   if (!paymentHistory || !Array.isArray(paymentHistory)) {
     return [];
   }
   
   let filtered = [...paymentHistory];
   
-  // Filter by group - SAFE CHECK
   if (customFilters.groupId && customFilters.groupId !== "all") {
     filtered = filtered.filter(p => p?.groupId === customFilters.groupId);
   }
   
-  // Filter by date range - SAFE CHECK
+  
   if (customFilters.dateRange && customFilters.dateRange !== "all") {
     const days = parseInt(customFilters.dateRange);
     if (!isNaN(days)) {

@@ -18,7 +18,7 @@ const CustomView = ({ groupContributions, onFilterChange }) => {
 
   return (
     <section className="section-card" style={{ marginBottom: "1rem" }}>
-      <h3>🔧 Custom View</h3>
+      <h3>Custom View</h3>
       <form style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center" }}>
         <label htmlFor="groupFilter">
           Filter by Group:

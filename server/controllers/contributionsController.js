@@ -1,14 +1,13 @@
-// server/controllers/contributionsController.js
 const { getFirestore } = require("../firebase/admin");
 
 async function getUserContributions(req, res) {
   try {
     const userId = req.user.uid;
-    console.log("🔍 getUserContributions - userId:", userId);
+    console.log("getUserContributions - userId:", userId);
 
     const db = getFirestore();
     if (!db) {
-      console.error("❌ db is undefined!");
+      console.error("db is undefined!");
       return res.status(500).json({ error: "Database not initialized" });
     }
 
@@ -35,7 +34,7 @@ async function getUserContributions(req, res) {
     payments.sort((a, b) => new Date(b.date) - new Date(a.date));
     res.json(payments);
   } catch (error) {
-    console.error("❌ Error fetching user contributions:", error.message);
+    console.error("Error fetching user contributions:", error.message);
     res.status(500).json({ error: "Failed to fetch contributions", details: error.message });
   }
 }
@@ -43,11 +42,11 @@ async function getUserContributions(req, res) {
 async function getTotPaid(req, res) {
   try {
     const userId = req.user.uid;
-    console.log("🔍 getTotPaid - userId:", userId);
+    console.log("getTotPaid - userId:", userId);
 
     const db = getFirestore();
     if (!db) {
-      console.error("❌ db is undefined!");
+      console.error("db is undefined!");
       return res.status(500).json({ error: "Database not initialized" });
     }
 
@@ -73,14 +72,14 @@ async function getTotPaid(req, res) {
       });
     });
 
-    console.log(`✅ Total paid: R${totalPaid} from ${payments.length} payments`);
+    console.log(`Total paid: R${totalPaid} from ${payments.length} payments`);
     res.json({
       total: totalPaid,
       count: payments.length,
       contributions: payments
     });
   } catch (error) {
-    console.error("❌ Error in getTotPaid:", error.message);
+    console.error("Error in getTotPaid:", error.message);
     res.status(500).json({ error: "Failed to calculate total paid", details: error.message });
   }
 }
@@ -88,11 +87,11 @@ async function getTotPaid(req, res) {
 async function getContributionsByGroup(req, res) {
   try {
     const userId = req.user.uid;
-    console.log("🔍 getContributionsByGroup - userId:", userId);
+    console.log("getContributionsByGroup - userId:", userId);
 
     const db = getFirestore();
     if (!db) {
-      console.error("❌ db is undefined!");
+      console.error("db is undefined!");
       return res.status(500).json({ error: "Database not initialized" });
     }
 
@@ -125,10 +124,10 @@ async function getContributionsByGroup(req, res) {
       }
     });
 
-    console.log(`✅ Group breakdown: ${groupMap.size} groups found`);
+    console.log(`Group breakdown: ${groupMap.size} groups found`);
     res.json(Array.from(groupMap.values()));
   } catch (error) {
-    console.error("❌ Error fetching grouped contributions:", error.message);
+    console.error("Error fetching grouped contributions:", error.message);
     res.status(500).json({ error: "Failed to fetch grouped contributions", details: error.message });
   }
 }

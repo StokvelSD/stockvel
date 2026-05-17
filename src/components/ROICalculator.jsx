@@ -1,12 +1,10 @@
-// src/components/ROICalculator.jsx
 const ROICalculator = ({ groupContributions, paymentHistory, totalPaid }) => {
-  // Calculate total interest earned (if you have payout data)
-  // For now, show contribution breakdown per group
+  
   
   const getGroupROI = (groupId) => {
     const group = groupContributions.find(g => g.groupId === groupId);
     if (!group) return null;
-    // Calculate percentage of total contributions
+    
     const percentage = (group.totalPaid / totalPaid) * 100;
     return { totalPaid: group.totalPaid, percentage: percentage.toFixed(1) };
   };
