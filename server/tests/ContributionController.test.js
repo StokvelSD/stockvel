@@ -1,24 +1,26 @@
 // tests/ContributionController.test.js
 
-// Mock must match the actual export: module.exports = db (bare object, not { db })
+const mockCollection = jest.fn()
+const mockDb = { collection: mockCollection }
+
 jest.mock('../firebase/admin', () => ({
-  collection: jest.fn()
+  getFirestore: jest.fn(() => mockDb)
 }))
 
 const {
-  getPaidContributions,
   getUserContributions,
-  getUserContributionsByGroup
+  getTotPaid,
+  getContributionsByGroup
 } = require('../controllers/contributionsController')
 
-// Import the mock directly — it IS the db
-const db = require('../firebase/admin')
+const { getFirestore } = require('../firebase/admin')
 
 describe('Contributions Controller', () => {
   let req, res
 
   beforeEach(() => {
     jest.clearAllMocks()
+    getFirestore.mockReturnValue(mockDb)
 
     req = {
       user: { uid: 'test-user-123' },
@@ -31,196 +33,175 @@ describe('Contributions Controller', () => {
     }
   })
 
-  describe('getPaidContributions', () => {
-    it('should return paid contributions for a specific group and user', async () => {
-      req.query.groupId = 'group-123'
-
-      const mockDocs = {
-        forEach: (callback) => {
-          callback({ id: '1', data: () => ({ amount: 500, status: 'paid', userId: 'test-user-123', groupId: 'group-123' }) })
-          callback({ id: '2', data: () => ({ amount: 750, status: 'paid', userId: 'test-user-123', groupId: 'group-123' }) })
-        }
-      }
-
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
-
-      await getPaidContributions(req, res)
-
-      expect(db.collection).toHaveBeenCalledWith('contributions')
-      expect(res.json).toHaveBeenCalledWith([
-        { id: '1', amount: 500, status: 'paid', userId: 'test-user-123', groupId: 'group-123' },
-        { id: '2', amount: 750, status: 'paid', userId: 'test-user-123', groupId: 'group-123' }
-      ])
-    })
-
-    it('should return empty array when no paid contributions exist', async () => {
-      req.query.groupId = 'group-123'
-
-      const mockDocs = { forEach: (callback) => {} }
-
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
-
-      await getPaidContributions(req, res)
-
-      expect(res.json).toHaveBeenCalledWith([])
-    })
-
-    it('should handle database error', async () => {
-      req.query.groupId = 'group-123'
-
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockRejectedValue(new Error('Database connection failed'))
-      })
-
-      await getPaidContributions(req, res)
-
-      expect(res.status).toHaveBeenCalledWith(500)
-      expect(res.json).toHaveBeenCalledWith({ error: 'Failed to fetch contributions' })
-    })
+  const makeChain = (docs) => ({
+    where: jest.fn().mockReturnThis(),
+    get: jest.fn().mockResolvedValue({ forEach: (cb) => docs.forEach(cb) })
   })
+
+  const makeErrorChain = (message) => ({
+    where: jest.fn().mockReturnThis(),
+    get: jest.fn().mockRejectedValue(new Error(message))
+  })
+
+  // ── getUserContributions ─────────────────────────────────────────────────
 
   describe('getUserContributions', () => {
-    it('should return all contributions for a user', async () => {
-      const mockDocs = {
-        forEach: (callback) => {
-          callback({ id: '1', data: () => ({ amount: 500, status: 'paid', userId: 'test-user-123', groupId: 'group-1' }) })
-          callback({ id: '2', data: () => ({ amount: 750, status: 'pending', userId: 'test-user-123', groupId: 'group-2' }) })
-        }
-      }
+    it('should return contributions for a user', async () => {
+      const mockDate = { toDate: () => new Date('2025-01-01') }
+      const docs = [
+        { id: '1', data: () => ({ amount: 500, groupId: 'g1', groupName: 'Club A', status: 'paid', createdAt: mockDate }) },
+        { id: '2', data: () => ({ amount: 750, groupId: 'g2', groupName: 'Club B', status: 'pending', createdAt: mockDate }) }
+      ]
 
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
+      mockCollection.mockReturnValue(makeChain(docs))
 
       await getUserContributions(req, res)
 
-      expect(db.collection).toHaveBeenCalledWith('contributions')
-      expect(res.json).toHaveBeenCalledWith([
-        { id: '1', amount: 500, status: 'paid', userId: 'test-user-123', groupId: 'group-1' },
-        { id: '2', amount: 750, status: 'pending', userId: 'test-user-123', groupId: 'group-2' }
-      ])
+      expect(mockCollection).toHaveBeenCalledWith('payments')
+      const body = res.json.mock.calls[0][0]
+      expect(body).toHaveLength(2)
+      expect(body[0]).toMatchObject({ id: '1', amount: 500, groupName: 'Club A' })
     })
 
     it('should return empty array when user has no contributions', async () => {
-      const mockDocs = { forEach: (callback) => {} }
-
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
+      mockCollection.mockReturnValue(makeChain([]))
 
       await getUserContributions(req, res)
 
       expect(res.json).toHaveBeenCalledWith([])
     })
 
-    it('should handle database error', async () => {
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockRejectedValue(new Error('Database error'))
-      })
+    it('should sort contributions by date descending', async () => {
+      const docs = [
+        { id: '1', data: () => ({ amount: 100, createdAt: { toDate: () => new Date('2025-01-01') } }) },
+        { id: '2', data: () => ({ amount: 200, createdAt: { toDate: () => new Date('2025-06-01') } }) }
+      ]
+
+      mockCollection.mockReturnValue(makeChain(docs))
+
+      await getUserContributions(req, res)
+
+      const body = res.json.mock.calls[0][0]
+      expect(body[0].amount).toBe(200) // June first (most recent)
+      expect(body[1].amount).toBe(100)
+    })
+
+    it('should return 500 on database error', async () => {
+      mockCollection.mockReturnValue(makeErrorChain('DB error'))
 
       await getUserContributions(req, res)
 
       expect(res.status).toHaveBeenCalledWith(500)
-      expect(res.json).toHaveBeenCalledWith({ error: 'Failed to fetch contributions' })
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Failed to fetch contributions' })
+      )
     })
   })
 
-  describe('getUserContributionsByGroup', () => {
-    it('should return contributions grouped by group', async () => {
-      const mockDocs = {
-        forEach: (callback) => {
-          callback({ data: () => ({ amount: 500, groupId: 'group-1', groupName: 'Savings Group' }) })
-          callback({ data: () => ({ amount: 300, groupId: 'group-1', groupName: 'Savings Group' }) })
-          callback({ data: () => ({ amount: 1000, groupId: 'group-2', groupName: 'Investment Club' }) })
-        }
-      }
+  // ── getTotPaid ───────────────────────────────────────────────────────────
 
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
+  describe('getTotPaid', () => {
+    it('should return total paid amount and count', async () => {
+      const docs = [
+        { id: '1', data: () => ({ amount: 500, groupId: 'g1', groupName: 'Club A', status: 'paid' }) },
+        { id: '2', data: () => ({ amount: 300, groupId: 'g1', groupName: 'Club A', status: 'paid' }) }
+      ]
 
-      await getUserContributionsByGroup(req, res)
+      mockCollection.mockReturnValue(makeChain(docs))
+
+      await getTotPaid(req, res)
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ total: 800, count: 2 })
+      )
+    })
+
+    it('should return zero total when no paid contributions', async () => {
+      mockCollection.mockReturnValue(makeChain([]))
+
+      await getTotPaid(req, res)
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ total: 0, count: 0, contributions: [] })
+      )
+    })
+
+    it('should default amount to 0 when missing', async () => {
+      const docs = [
+        { id: '1', data: () => ({ groupId: 'g1', status: 'paid' }) } // no amount
+      ]
+
+      mockCollection.mockReturnValue(makeChain(docs))
+
+      await getTotPaid(req, res)
+
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ total: 0, count: 1 })
+      )
+    })
+
+    it('should return 500 on database error', async () => {
+      mockCollection.mockReturnValue(makeErrorChain('DB error'))
+
+      await getTotPaid(req, res)
+
+      expect(res.status).toHaveBeenCalledWith(500)
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Failed to calculate total paid' })
+      )
+    })
+  })
+
+  // ── getContributionsByGroup ──────────────────────────────────────────────
+
+  describe('getContributionsByGroup', () => {
+    it('should return contributions grouped by group with totals', async () => {
+      const docs = [
+        { id: '1', data: () => ({ amount: 500, groupId: 'g1', groupName: 'Savings Group', status: 'paid' }) },
+        { id: '2', data: () => ({ amount: 300, groupId: 'g1', groupName: 'Savings Group', status: 'paid' }) },
+        { id: '3', data: () => ({ amount: 1000, groupId: 'g2', groupName: 'Investment Club', status: 'paid' }) }
+      ]
+
+      mockCollection.mockReturnValue(makeChain(docs))
+
+      await getContributionsByGroup(req, res)
 
       expect(res.json).toHaveBeenCalledWith([
-        { groupId: 'group-1', groupName: 'Savings Group', totalPaid: 800 },
-        { groupId: 'group-2', groupName: 'Investment Club', totalPaid: 1000 }
+        { groupId: 'g1', groupName: 'Savings Group', totalPaid: 800, contributionCount: 2 },
+        { groupId: 'g2', groupName: 'Investment Club', totalPaid: 1000, contributionCount: 1 }
       ])
     })
 
-    it('should return empty array when user has no contributions', async () => {
-      const mockDocs = { forEach: (callback) => {} }
+    it('should return empty array when no contributions', async () => {
+      mockCollection.mockReturnValue(makeChain([]))
 
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
-
-      await getUserContributionsByGroup(req, res)
+      await getContributionsByGroup(req, res)
 
       expect(res.json).toHaveBeenCalledWith([])
     })
 
-    it('should handle contributions without groupName', async () => {
-      const mockDocs = {
-        forEach: (callback) => {
-          callback({ data: () => ({ amount: 500, groupId: 'group-1' }) })
-          callback({ data: () => ({ amount: 300, groupId: 'group-1' }) })
-        }
-      }
+    it('should default groupName to Unknown when missing', async () => {
+      const docs = [
+        { id: '1', data: () => ({ amount: 500, groupId: 'g1', status: 'paid' }) }
+      ]
 
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
+      mockCollection.mockReturnValue(makeChain(docs))
 
-      await getUserContributionsByGroup(req, res)
+      await getContributionsByGroup(req, res)
 
-      expect(res.json).toHaveBeenCalledWith([
-        { groupId: 'group-1', groupName: 'Unknown', totalPaid: 800 }
-      ])
+      const body = res.json.mock.calls[0][0]
+      expect(body[0].groupName).toBe('Unknown')
     })
 
-    it('should handle contributions without amount', async () => {
-      const mockDocs = {
-        forEach: (callback) => {
-          callback({ data: () => ({ groupId: 'group-1', groupName: 'Savings Group' }) })
-          callback({ data: () => ({ amount: 300, groupId: 'group-1', groupName: 'Savings Group' }) })
-        }
-      }
+    it('should return 500 on database error', async () => {
+      mockCollection.mockReturnValue(makeErrorChain('DB error'))
 
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockResolvedValue(mockDocs)
-      })
-
-      await getUserContributionsByGroup(req, res)
-
-      expect(res.json).toHaveBeenCalledWith([
-        { groupId: 'group-1', groupName: 'Savings Group', totalPaid: 300 }
-      ])
-    })
-
-    it('should handle database error', async () => {
-      db.collection.mockReturnValue({
-        where: jest.fn().mockReturnThis(),
-        get: jest.fn().mockRejectedValue(new Error('Database error'))
-      })
-
-      await getUserContributionsByGroup(req, res)
+      await getContributionsByGroup(req, res)
 
       expect(res.status).toHaveBeenCalledWith(500)
-      expect(res.json).toHaveBeenCalledWith({ error: 'Failed to fetch grouped contributions' })
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ error: 'Failed to fetch grouped contributions' })
+      )
     })
   })
 })
