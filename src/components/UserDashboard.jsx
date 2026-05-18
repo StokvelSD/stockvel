@@ -9,16 +9,13 @@ import {
   getDoc,
   addDoc,
   updateDoc,
+  arrayUnion,
   query,
   where,
 } from "firebase/firestore";
 import MyGroups from "../components/MyGroups";
 import SavingsProjection from "./SavingsProjection";
 import { fetchTotalPaid, fetchContributionsByGroup } from "../services/contributions";
-import ContributionPieChart from "../components/ContributionPieChart";
-import ExportButtons from "../components/ExportButtons";
-import ROICalculator from "./ROICalculator";
-import CustomView from "./CustomView";
 
 const UserDashboard = () => {
   const { user } = useAuth();
@@ -29,19 +26,21 @@ const UserDashboard = () => {
   const [messageMap, setMessageMap] = useState({});
   const [showBrowseGroups, setShowBrowseGroups] = useState(false);
   const [userGroups, setUserGroups] = useState([]);
+  const [userRole, setUserRole] = useState("user");
   const [pendingRequests, setPendingRequests] = useState([]);
+  const [adminRequestPending, setAdminRequestPending] = useState(false);
+  const [adminRequestDoc, setAdminRequestDoc] = useState(null);
+  const [sendingAdminRequest, setSendingAdminRequest] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [sendingRequest, setSendingRequest] = useState(null);
 
-  const [totalPaid, setTotalPaid] = useState(0);
-  const [contributionCount, setContributionCount] = useState(0);
-  const [groupContributions, setGroupContributions] = useState([]);
-  const [loadingRealData, setLoadingRealData] = useState(true);
+  const[totalPaid, setTotalPaid] = useState(0);
+  const[contributionCount, setContributionCount] = useState(0);
+  const[groupContributions, setGroupContributions] = useState([]);
+  const[loadingRealData, setLoadingRealData] = useState(true);
 
-  const [upcomingPayments, setUpComingPayments] = useState([]);
-  const [paymentHistory, setPaymentHistory] = useState([]);
-
-  const[customFilters, setCustomFilters] = useState({ groupId: "all", dateRange: "all" });  
+  const[upcomingPayments, setUpComingPayments] = useState([]);
+  const[paymentHistory, setPaymentHistory] = useState([]);
 
 
   useEffect(() => {
@@ -50,6 +49,7 @@ const UserDashboard = () => {
     }
   }, [showBrowseGroups, user]);
 
+  // ── Fetch unread notification count ──────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const fetchCount = async () => {
@@ -58,6 +58,7 @@ const UserDashboard = () => {
         if (!userDoc.exists()) return;
         const groupIds = userDoc.data().groups || [];
 
+        // Read already-seen IDs from localStorage
         const seenRaw = localStorage.getItem(`notif_seen_${user.uid}`);
         const seenIds = seenRaw ? new Set(JSON.parse(seenRaw)) : new Set();
 
@@ -100,7 +101,9 @@ const UserDashboard = () => {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
-          setUserGroups(userDoc.data().groups || []);
+          const data = userDoc.data();
+          setUserGroups(data.groups || []);
+          setUserRole(data.role || "user");
         }
       } catch (err) {
         console.error("Failed to load user groups:", err);
@@ -110,69 +113,58 @@ const UserDashboard = () => {
   }, [user]);
 
   useEffect(() => {
-    const loadRealContributionData = async () => {
+    const loadAdminRequest = async () => {
       if (!user) return;
-      setLoadingRealData(true);
       try {
-        const { total, count, contributions } = await fetchTotalPaid();
+        const q = query(
+          collection(db, "adminRequests"),
+          where("userId", "==", user.uid),
+        );
+        const snap = await getDocs(q);
+        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const pending = docs.find((r) => r.status === "pending");
+        setAdminRequestPending(!!pending);
+        setAdminRequestDoc(pending || null);
+      } catch (err) {
+        console.error("Failed to load admin request:", err);
+      }
+    };
+    loadAdminRequest();
+  }, [user]);
+
+
+  useEffect(() => {
+    const loadRealContributionData = async () => {
+      if(!user)return;
+      setLoadingRealData(true);
+
+      try{
+        const {total, count, contributions} = await fetchTotalPaid();
         setTotalPaid(total);
         setContributionCount(count);
         setPaymentHistory(contributions);
+
         const byGroup = await fetchContributionsByGroup();
         setGroupContributions(byGroup);
+
         setUpComingPayments([]);
-      } catch (error) {
+      }catch(error){
         console.error("Error loading contribution data", error);
-      } finally {
+      }finally{
         setLoadingRealData(false);
       }
     };
     loadRealContributionData();
   }, [user]);
 
- const handleFilterChange = (filters) => {
-  setCustomFilters(prev => ({
-    ...prev,
-    ...filters
-  }));
-};
-
-
-const getFilteredPayments = () => {
-  if (!paymentHistory || !Array.isArray(paymentHistory)) {
-    return [];
-  }
-  
-  let filtered = [...paymentHistory];
-  
-  if (customFilters.groupId && customFilters.groupId !== "all") {
-    filtered = filtered.filter(p => p?.groupId === customFilters.groupId);
-  }
-  
-  
-  if (customFilters.dateRange && customFilters.dateRange !== "all") {
-    const days = parseInt(customFilters.dateRange);
-    if (!isNaN(days)) {
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - days);
-      filtered = filtered.filter(p => {
-        if (!p?.date) return false;
-        const paymentDate = new Date(p.date);
-        return !isNaN(paymentDate) && paymentDate >= cutoffDate;
-      });
-    }
-  }
-  
-  return filtered;
-};
-
-  const filteredPayments = getFilteredPayments();
 
   const fetchAvailableGroups = async () => {
     setLoadingGroups(true);
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userGroupsData = userDoc.exists() ? userDoc.data().groups || [] : [];
+      const userGroupsData = userDoc.exists()
+        ? userDoc.data().groups || []
+        : [];
       setUserGroups(userGroupsData);
 
       const requestsQuery = query(
@@ -194,6 +186,31 @@ const getFilteredPayments = () => {
       setMessageMap({ error: { type: "error", text: err.message } });
     } finally {
       setLoadingGroups(false);
+    }
+  };
+
+  const fetchUserGroups = async () => {
+    if (!user) return;
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) setUserGroups(userDoc.data().groups || []);
+    } catch (err) {
+      console.error("Failed to fetch user groups:", err);
+    }
+  };
+
+  const fetchPendingRequests = async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, "joinRequests"),
+        where("userId", "==", user.uid),
+        where("status", "==", "pending"),
+      );
+      const snap = await getDocs(q);
+      setPendingRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("Failed to fetch pending requests:", err);
     }
   };
 
@@ -260,21 +277,6 @@ const getFilteredPayments = () => {
     }
   };
 
-  const fetchPendingRequests = async () => {
-    if (!user) return;
-    try {
-      const q = query(
-        collection(db, "joinRequests"),
-        where("userId", "==", user.uid),
-        where("status", "==", "pending"),
-      );
-      const snap = await getDocs(q);
-      setPendingRequests(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.error("Failed to fetch pending requests:", err);
-    }
-  };
-
   const handleCancelRequest = async (groupId, groupName) => {
     setSendingRequest(groupId);
     try {
@@ -288,20 +290,74 @@ const getFilteredPayments = () => {
         await fetchAvailableGroups();
       }
     } catch (err) {
-      setMessage(groupId, "error", "Failed to cancel request. Please try again.");
+      setMessage(
+        groupId,
+        "error",
+        "Failed to cancel request. Please try again.",
+      );
     } finally {
       setSendingRequest(null);
     }
   };
 
+  const handleRequestAdmin = async () => {
+    if (!user) {
+      setMessage("admin", "error", "Please log in to request admin role");
+      return;
+    }
+    if (adminRequestPending) {
+      setMessage("admin", "error", "You already have a pending admin request");
+      return;
+    }
+    setSendingAdminRequest(true);
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      const docRef = await addDoc(collection(db, "adminRequests"), {
+        userId: user.uid,
+        userName: userData.name || user.displayName || user.email,
+        userEmail: user.email,
+        status: "pending",
+        requestedAt: new Date(),
+      });
+      setAdminRequestPending(true);
+      setAdminRequestDoc({ id: docRef.id, userId: user.uid, status: "pending" });
+      setMessage("admin", "success", "Admin request sent. An admin will review it.");
+    } catch (err) {
+      console.error("Failed to request admin:", err);
+      setMessage("admin", "error", "Failed to send admin request. Please try again.");
+    } finally {
+      setSendingAdminRequest(false);
+    }
+  };
+
+  const handleCancelAdminRequest = async () => {
+    if (!adminRequestDoc) return;
+    setSendingAdminRequest(true);
+    try {
+      await updateDoc(doc(db, "adminRequests", adminRequestDoc.id), {
+        status: "cancelled",
+        cancelledAt: new Date(),
+      });
+      setAdminRequestPending(false);
+      setAdminRequestDoc(null);
+      setMessage("admin", "success", "Admin request cancelled.");
+    } catch (err) {
+      console.error("Failed to cancel admin request:", err);
+      setMessage("admin", "error", "Failed to cancel admin request.");
+    } finally {
+      setSendingAdminRequest(false);
+    }
+  };
+
   const nextPaymentDate = upcomingPayments[0]?.dueDate || "No upcoming payments";
-  const nextPaymentAmount = upcomingPayments[0]?.amount || 0;
+  const nextPaymentAmount = upcomingPayments[0]?.amount|| 0;
 
   if (showBrowseGroups) {
     return (
-      <main className="dashboard-page">
-        <section className="dashboard-inner">
-          <section style={{ marginBottom: "1.5rem" }}>
+      <div className="dashboard-page">
+        <div className="dashboard-inner">
+          <div style={{ marginBottom: "1.5rem" }}>
             <button
               className="btn btn-outline"
               onClick={() => setShowBrowseGroups(false)}
@@ -319,10 +375,10 @@ const getFilteredPayments = () => {
               </svg>
               Back to Dashboard
             </button>
-          </section>
+          </div>
 
-          <section className="section-card">
-            <header
+          <div className="section-card">
+            <div
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -332,7 +388,7 @@ const getFilteredPayments = () => {
                 borderBottom: "1px solid var(--border)",
               }}
             >
-              <h3
+              <span
                 style={{
                   fontSize: "0.875rem",
                   fontWeight: 700,
@@ -342,13 +398,13 @@ const getFilteredPayments = () => {
                 }}
               >
                 Available Stokvel Groups
-              </h3>
+              </span>
               {pendingRequests.length > 0 && (
-                <strong className="badge badge-warning">
+                <span className="badge badge-warning">
                   {pendingRequests.length} pending request(s)
-                </strong>
+                </span>
               )}
-            </header>
+            </div>
 
             {loadingGroups ? (
               <p style={{ color: "var(--text-muted)", padding: "1rem 0" }}>
@@ -359,7 +415,7 @@ const getFilteredPayments = () => {
                 No groups available to join.
               </p>
             ) : (
-              <section
+              <div
                 style={{
                   display: "flex",
                   flexDirection: "column",
@@ -370,14 +426,15 @@ const getFilteredPayments = () => {
                   const msg = messageMap[group.id];
                   const isRequesting = requestingGroupId === group.id;
                   const isFull =
-                    (group.members?.length || 0) >= (group.maxMembers || Infinity);
+                    (group.members?.length || 0) >=
+                    (group.maxMembers || Infinity);
                   const isMember = userGroups.includes(group.id);
                   const hasPendingRequest = pendingRequests.some(
                     (r) => r.groupId === group.id,
                   );
 
                   return (
-                    <article
+                    <div
                       key={group.id}
                       className="group-row"
                       style={{
@@ -392,8 +449,8 @@ const getFilteredPayments = () => {
                         flexWrap: "wrap",
                       }}
                     >
-                      <section style={{ flex: 2, minWidth: "200px" }}>
-                        <header
+                      <div style={{ flex: 2, minWidth: "200px" }}>
+                        <div
                           style={{
                             display: "flex",
                             alignItems: "center",
@@ -406,38 +463,38 @@ const getFilteredPayments = () => {
                             {group.groupName || group.name}
                           </h3>
                           {group.category && (
-                            <strong
+                            <span
                               className="badge badge-info"
                               style={{ fontSize: "0.7rem" }}
                             >
                               {group.category}
-                            </strong>
+                            </span>
                           )}
                           {isMember && (
-                            <strong
+                            <span
                               className="badge badge-success"
                               style={{ fontSize: "0.7rem" }}
                             >
                               ✓ Member
-                            </strong>
+                            </span>
                           )}
                           {hasPendingRequest && (
-                            <strong
+                            <span
                               className="badge badge-warning"
                               style={{ fontSize: "0.7rem" }}
                             >
                               ⏳ Pending Approval
-                            </strong>
+                            </span>
                           )}
                           {isFull && !isMember && (
-                            <strong
+                            <span
                               className="badge badge-danger"
                               style={{ fontSize: "0.7rem" }}
                             >
                               Full
-                            </strong>
+                            </span>
                           )}
-                        </header>
+                        </div>
                         {group.description && (
                           <p
                             style={{
@@ -450,23 +507,24 @@ const getFilteredPayments = () => {
                           </p>
                         )}
                         {msg && (
-                          <section
+                          <div
                             style={{
                               marginTop: "0.5rem",
                               padding: "0.5rem",
                               borderRadius: "4px",
                               background:
                                 msg.type === "success" ? "#d4edda" : "#f8d7da",
-                              color: msg.type === "success" ? "#155724" : "#721c24",
+                              color:
+                                msg.type === "success" ? "#155724" : "#721c24",
                               fontSize: "0.875rem",
                             }}
                           >
                             {msg.text}
-                          </section>
+                          </div>
                         )}
-                      </section>
+                      </div>
 
-                      <section
+                      <div
                         style={{
                           flex: 1,
                           minWidth: "150px",
@@ -476,34 +534,35 @@ const getFilteredPayments = () => {
                         }}
                       >
                         {group.contributionAmount && (
-                          <section>
-                            <small
+                          <div>
+                            <div
                               style={{
                                 color: "var(--text-muted)",
                                 fontSize: "0.75rem",
                               }}
                             >
                               Monthly
-                            </small>
+                            </div>
                             <strong>R{group.contributionAmount}</strong>
-                          </section>
+                          </div>
                         )}
-                        <section>
-                          <small
+                        <div>
+                          <div
                             style={{
                               color: "var(--text-muted)",
                               fontSize: "0.75rem",
                             }}
                           >
                             Members
-                          </small>
-                          <strong>
-                            {group.members?.length || 0} / {group.maxMembers || "∞"}
-                          </strong>
-                        </section>
-                      </section>
+                          </div>
+                          <span>
+                            {group.members?.length || 0} /{" "}
+                            {group.maxMembers || "∞"}
+                          </span>
+                        </div>
+                      </div>
 
-                      <section style={{ minWidth: "160px" }}>
+                      <div style={{ minWidth: "160px" }}>
                         {isMember ? (
                           <button
                             className="btn btn-success"
@@ -517,14 +576,23 @@ const getFilteredPayments = () => {
                             className="btn btn-danger"
                             style={{ width: "100%" }}
                             onClick={() =>
-                              handleCancelRequest(group.id, group.groupName || group.name)
+                              handleCancelRequest(
+                                group.id,
+                                group.groupName || group.name,
+                              )
                             }
                             disabled={sendingRequest === group.id}
                           >
-                            {sendingRequest === group.id ? "Cancelling..." : "Cancel Request"}
+                            {sendingRequest === group.id
+                              ? "Cancelling..."
+                              : "Cancel Request"}
                           </button>
                         ) : isFull ? (
-                          <button className="btn btn-outline" style={{ width: "100%" }} disabled>
+                          <button
+                            className="btn btn-outline"
+                            style={{ width: "100%" }}
+                            disabled
+                          >
                             Group Full
                           </button>
                         ) : (
@@ -532,36 +600,42 @@ const getFilteredPayments = () => {
                             className="btn btn-primary"
                             style={{ width: "100%" }}
                             onClick={() =>
-                              handleJoinRequest(group.id, group.groupName || group.name)
+                              handleJoinRequest(
+                                group.id,
+                                group.groupName || group.name,
+                              )
                             }
                             disabled={isRequesting}
                           >
-                            {isRequesting ? "Sending Request..." : "Request to Join"}
+                            {isRequesting
+                              ? "Sending Request..."
+                              : "Request to Join"}
                           </button>
                         )}
-                      </section>
-                    </article>
+                      </div>
+                    </div>
                   );
                 })}
-              </section>
+              </div>
             )}
-          </section>
-        </section>
-      </main>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-inner">
-        <header className="dashboard-header">
+    <div className="dashboard-page">
+      <div className="dashboard-inner">
+        <div className="dashboard-header">
           <h2>My Dashboard</h2>
           <p>Track your stokvel savings and upcoming contributions.</p>
-        </header>
+        </div>
 
         <SavingsProjection userBalance={totalPaid} />
 
-        <section
+        {/* Buttons row */}
+        <div
           style={{
             display: "flex",
             alignItems: "center",
@@ -569,6 +643,7 @@ const getFilteredPayments = () => {
             marginBottom: "1.5rem",
           }}
         >
+          {/* Browse Groups */}
           <button
             className="btn btn-primary"
             onClick={() => setShowBrowseGroups(true)}
@@ -590,7 +665,31 @@ const getFilteredPayments = () => {
             Browse Available Groups
           </button>
 
-          <section style={{ position: "relative", display: "inline-block" }}>
+          {/* Request Admin Role */}
+          {userRole !== "admin" && (
+            <div style={{ minWidth: "180px" }}>
+              {adminRequestPending ? (
+                <button
+                  className="btn btn-danger"
+                  onClick={handleCancelAdminRequest}
+                  disabled={sendingAdminRequest}
+                >
+                  {sendingAdminRequest ? "Cancelling..." : "Cancel Admin Request"}
+                </button>
+              ) : (
+                <button
+                  className="btn btn-outline"
+                  onClick={handleRequestAdmin}
+                  disabled={sendingAdminRequest}
+                >
+                  {sendingAdminRequest ? "Sending..." : "Request Admin Role"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Notification bell — fixed badge ── */}
+          <div style={{ position: "relative", display: "inline-block" }}>
             <button
               className="btn btn-primary"
               onClick={() => navigate("/notifications")}
@@ -610,8 +709,9 @@ const getFilteredPayments = () => {
               Notifications
             </button>
 
+            {/* Only render the badge when there is something to show */}
             {notificationCount > 0 && (
-              <strong
+              <span
                 style={{
                   position: "absolute",
                   top: "-6px",
@@ -632,67 +732,40 @@ const getFilteredPayments = () => {
                 }}
               >
                 {notificationCount > 99 ? "99+" : notificationCount}
-              </strong>
+              </span>
             )}
-          </section>
-        </section>
+          </div>
+        </div>
 
-        <section className="stats-grid" style={{ marginBottom: "2rem" }}>
-          <article className="stat-card accent-green">
-            <h3 className="stat-label">Total Paid</h3>
-            <p className="stat-value">
-              {loadingRealData ? "Loading..." : `R${totalPaid.toLocaleString()}`}
-            </p>
-            <small className="stat-sub">
-              {contributionCount} {contributionCount === 1 ? "payment" : "payments"}
-            </small>
-          </article>
+        {/* Stats cards */}
+        <div className="stats-grid" style={{ marginBottom: "2rem" }}>
+          <div className="stat-card accent-green">
+            <div className="stat-label">Total Paid</div>
+            <div className="stat-value">{loadingRealData ? "Loading..." : `R${totalPaid.toLocaleString()}`}</div>
+            <div className="stat-sub">{contributionCount} {contributionCount === 1 ? "payment" : "payments"}</div>
+          </div>
+          <div className="stat-card accent-blue">
+            <div className="stat-label">Next Payment</div>
+            <div className="stat-value">
+              {nextPaymentDate !== "No upcoming payments" ? `amount: R${nextPaymentAmount}` : "No scheduled payments"}
+            </div>
+          </div>
 
-          <article className="stat-card accent-blue">
-            <h3 className="stat-label">Next Payment</h3>
-            <p className="stat-value">
-              {nextPaymentDate !== "No upcoming payments"
-                ? new Date(nextPaymentDate).toLocaleDateString()
-                : "N/A"}
-            </p>
-            <small className="stat-sub">
-              {nextPaymentDate !== "No upcoming payments"
-                ? `amount: R${nextPaymentAmount}`
-                : "No scheduled payments"}
-            </small>
-          </article>
+          <div className="stat-card accent-warn">
+            <div className="stat-label">My Groups</div>
+            <div className="stat-value">{loadingRealData ? "..." : userGroups.length}</div>
+            <div className="stat-sub">active memberships</div>
+          </div>
+        </div>
 
-          <article className="stat-card accent-warn">
-            <h3 className="stat-label">My Groups</h3>
-            <p className="stat-value">{loadingRealData ? "..." : userGroups.length}</p>
-            <small className="stat-sub">active memberships</small>
-          </article>
-        </section>
-
-        <section className="section-card" style={{ marginBottom: "2rem" }}>
+        {/* My Groups */}
+        <div className="section-card" style={{ marginBottom: "2rem" }}>
           <h3>📋 My Groups</h3>
           <MyGroups />
-        </section>
+        </div>
 
-        <ContributionPieChart />
-        <CustomView 
-          groupContributions={groupContributions}
-          onFilterChange={handleFilterChange}
-        />
-
-        {/* ROI Calculator */}
-        <ROICalculator 
-          groupContributions={groupContributions}
-          totalPaid={totalPaid}
-        />
-        <ExportButtons
-          paymentHistory={filteredPayments}
-          groupContributions={groupContributions}
-          totalPaid={totalPaid}
-        />
-
-      </section>
-    </main>
+      </div>
+    </div>
   );
 };
 
