@@ -105,10 +105,7 @@ const UserDashboard = () => {
       try {
         const userDoc = await getDoc(doc(db, "users", user.uid));
         if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUserGroups(data.groups || []);
-          setUserRole(data.role || "user");
-
+           setUserGroups(userDoc.data().groups || []);
         }
       } catch (err) {
         console.error("Failed to load user groups:", err);
