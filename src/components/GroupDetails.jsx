@@ -129,21 +129,38 @@ const fetchGroupContributions = () => {
   try {
     let q;
 
-    // Admins and treasurers see ALL payments
-if (!isAdmin && !isTreasurer) {
+
+    // Everyone is restricted to this group
+if (isAdmin || isTreasurer) {
+  // Admins and treasurers see ALL payments in the group
+  q = query(
+    collection(db, 'payments'),
+    where('groupId', '==', id)
+  );
+} else {
+  // Normal members see ONLY their own payments in the group
   q = query(
     collection(db, 'payments'),
     where('groupId', '==', id),
     where('userId', '==', user?.uid)
   );
-} else {
-      // Normal members only see their own contributions
-      q = query(
-        collection(db, 'payments'),
-        where('groupId', '==', id),
-        where('userId', '==', user?.uid)
-      );
-    }
+}
+
+//     // Admins and treasurers see ALL payments
+// if (!isAdmin && !isTreasurer) {
+//   q = query(
+//     collection(db, 'payments'),
+//     where('groupId', '==', id),
+//     where('userId', '==', user?.uid)
+//   );
+// } else {
+//       // Normal members only see their own contributions
+//       q = query(
+//         collection(db, 'payments'),
+//         where('groupId', '==', id),
+//         where('userId', '==', user?.uid)
+//       );
+//     }
 
     // Realtime listener
     const unsubscribe = onSnapshot(q, (snapshot) => {
